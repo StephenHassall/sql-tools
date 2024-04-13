@@ -1,0 +1,15 @@
+{
+  "name": "sql-tools",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Collection of SQL tools",
+  "main": "sql-tools.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Stephen Paul Hassall",
+  "license": "MIT"
+}
