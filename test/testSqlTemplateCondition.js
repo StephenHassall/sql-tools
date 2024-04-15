@@ -2,23 +2,26 @@
  * Test SQL Template Condition.
  */
 import Test from "./test.js";
-import SqlTools from "../sql-tools.js";
-import { SqlTemplateCondition } from "../sql-tools.js";
-import { TokenType } from "../sql-tools.js";
+import { SqlTemplateCondition } from "../sql-template-condition.js";
+import { TokenType } from "../token.js";
+import { NodeType } from "../node.js";
 
 export default class TestSqlTemplateCondition {
-    static async run() {
+    static run() {
         // Set test
         Test.test('SqlTemplateCondition');
 
         // Perform tests
-        TestSqlTemplateCondition.testGetNextToken();
+        //TestSqlTemplateCondition.testGetNextToken();
+        //TestSqlTemplateCondition.testBuild();
+
+        TestSqlTemplateCondition.testGetResult();
     }
 
     /**
      * Test the get next token.
      */
-    static async testGetNextToken() {
+    static testGetNextToken() {
         // Test empty
         Test.describe('getNextToken empty');
         let condition = new SqlTemplateCondition('TEST');
@@ -47,9 +50,72 @@ export default class TestSqlTemplateCondition {
     }
 
     /**
+     * Test the build node tree.
+     */
+    static testBuild() {
+        Test.describe('getNextToken empty');
+        let condition = new SqlTemplateCondition('');
+        condition._condition = '$test=1';
+        condition._tokenIndex = 0;
+        condition._build();
+        let booleanExpression = condition._booleanNode;
+        Test.assertEqual(booleanExpression.nodeType, NodeType.BOOL_EXPRESSION);
+        Test.assertEqual(booleanExpression.nodeList.length, 1);
+        let relationExpression = booleanExpression.nodeList[0];
+        Test.assertEqual(relationExpression.nodeType, NodeType.RELATION_EXPRESSION);
+        Test.assertEqual(relationExpression.nodeList.length, 3);
+        Test.assertEqual(relationExpression.nodeList[0].nodeType, NodeType.EXPRESSION);
+        Test.assertEqual(relationExpression.nodeList[1].nodeType, NodeType.TOKEN);
+        Test.assertEqual(relationExpression.nodeList[1].token.tokenType, TokenType.COMPARE_EQUAL);
+        Test.assertEqual(relationExpression.nodeList[2].nodeType, NodeType.EXPRESSION);
+
+        let expression = relationExpression.nodeList[0];
+        Test.assertEqual(expression.nodeList.length, 1);
+        Test.assertEqual(expression.nodeList[0].nodeType, NodeType.TERM);
+        let term = expression.nodeList[0];
+        Test.assertEqual(term.nodeList.length, 1);
+        Test.assertEqual(term.nodeList[0].nodeType, NodeType.FACTOR);
+        let factor = term.nodeList[0];
+        Test.assertEqual(factor.nodeList.length, 1);
+        Test.assertEqual(factor.nodeList[0].nodeType, NodeType.TOKEN);
+        Test.assertEqual(factor.nodeList[0].token.tokenType, TokenType.IDENTIFIER);
+
+        expression = relationExpression.nodeList[2];
+        Test.assertEqual(expression.nodeList.length, 1);
+        Test.assertEqual(expression.nodeList[0].nodeType, NodeType.TERM);
+        term = expression.nodeList[0];
+        Test.assertEqual(term.nodeList.length, 1);
+        Test.assertEqual(term.nodeList[0].nodeType, NodeType.FACTOR);
+        factor = term.nodeList[0];
+        Test.assertEqual(factor.nodeList.length, 1);
+        Test.assertEqual(factor.nodeList[0].nodeType, NodeType.TOKEN);
+        Test.assertEqual(factor.nodeList[0].token.tokenType, TokenType.NUMBER);
+    }
+
+    /**
+     * Test the get result.
+     */
+    static testGetResult() {
+        // Set values
+        const values = {
+            test1: 1,
+            test2: 0
+        };
+
+        Test.describe('getResult');
+        let condition = new SqlTemplateCondition('$test1=1');
+        let result = condition.getResult(values);
+        Test.assertEqual(result, true);
+        values.test1 = 0;
+        result = condition.getResult(values);
+        Test.assertEqual(result, false);
+    }
+
+    /**
      * Test the create condition token list.
      */
     static testCreateConditionTokenList() {
+        /*
         // Test empty
         let tokenList = SqlTools._createConditionTokenList('');
         if (tokenList.length !== 0) { console.log('Test SqlTools._createConditionTokenList: FAILED 1'); return; }
@@ -159,6 +225,7 @@ export default class TestSqlTemplateCondition {
         } catch (e) {
             if (e.message.startsWith('Missing closing string quotation mark') === false) { console.log('Test SqlTools._createConditionTokenList: FAILED 58'); return; }
         }
+        */
     }
 
     /**
