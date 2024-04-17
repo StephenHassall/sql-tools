@@ -27,6 +27,11 @@ export class SqlTemplateCondition {
         this._build();
     }
 
+    /**
+     * Get the boolean value result by processing the condition using the given values.
+     * @param {Object} values The values used to process the condition.
+     * @return {Boolean} The result of the condition.
+     */
     getResult(values) {
         // Set values
         this._values = values;
@@ -34,26 +39,6 @@ export class SqlTemplateCondition {
         // Get boolean expression node value
         return this._getNodeValue(this._booleanNode);
     }
-
-
-
-    /**
-     * Process the conditions for the #if and #elif preprocessor commands.
-     * @param {String} text The text being processed.
-     * @param {Object} values The values passed to the format function.
-     */
-    _processCondition(text, values) {
-        // Create condition token list
-        //const conditionTokenList = SqlTools._createConditionTokenList(text);
-
-        // Create condition tree
-        //const conditionTokenTree = SqlTools._createConditionTokenTree(conditionTokenList);
-
-        // Check condition tree errors
-
-    }
-
-    
 
     /**
      * Build the condition. This takes the condition text, reads each token and makes the boolean expression tree.
@@ -81,9 +66,6 @@ export class SqlTemplateCondition {
             // Get next token
             const token = this._getNextToken();
 
-            // If finished
-            if (token === null) break;
-
             // Continue processing this token
             while (true) {
                 // If processing boolean expression
@@ -101,7 +83,7 @@ export class SqlTemplateCondition {
 
                         // Add term to the row
                         nodeRowIndex++;
-                        nodeRowList[nodeRowIndex] = factorNode;
+                        nodeRowList[nodeRowIndex] = relationExpressionNode;
 
                         // Continue processing this token
                         continue;
@@ -109,6 +91,15 @@ export class SqlTemplateCondition {
 
                     // If state 1 (looking for and/or)
                     if (nodeRowList[nodeRowIndex].state === 1) {
+                        // If no more tokens
+                        if (token === null) {
+                            // If this is the first boolean expression then we have finished
+                            if (nodeRowIndex === 0) return;
+
+                            // Something has gone wrong
+                            throw new Error('Syntax error in condition');
+                        }
+
                         // If token AND OR
                         if (token.tokenType === TokenType.AND || token.tokenType === TokenType.OR) {
                             // Add new node to the list
@@ -120,8 +111,14 @@ export class SqlTemplateCondition {
                             // Move on to the next token
                             break;
                         } else {
-                            // Move on to the next token (there shouldn't be one)
-                            break;
+                            // If this is the lowest level then we should have finished
+                            if (nodeRowIndex === 0) break;
+                            
+                            // Finished this boolean expression. Go back one row
+                            nodeRowIndex--;
+
+                            // Continue processing this token
+                            continue;
                         }
                     }                    
                 }
@@ -130,6 +127,9 @@ export class SqlTemplateCondition {
                 if (nodeRowList[nodeRowIndex].nodeType === NodeType.RELATION_EXPRESSION) {
                     // If state 0 (looking for NOT)
                     if (nodeRowList[nodeRowIndex].state === 0) {
+                        // If no token then something is wrong
+                        if (token === null) throw new Error('Syntax error in condition');
+
                         // If token in not
                         if (token.tokenType === TokenType.NOT) {
                             // Add new node NOT to the list
@@ -149,18 +149,63 @@ export class SqlTemplateCondition {
                         continue;
                     }
 
-                    // If state 1 (looking for true, false or expression)
+                    // If state 1 (looking for true, false, (, or expression)
                     if (nodeRowList[nodeRowIndex].state === 1) {
+                        // If no token then something is wrong
+                        if (token === null) throw new Error('Syntax error in condition');
+
                         // If token true or false
                         if (token.tokenType === TokenType.TRUE || token.tokenType === TokenType.FALSE) {
-                            // Add new node NOT to the list
-                            nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
+                            // Poll the next token
+                            const nextToken = this._pollNextToken();
 
-                            // Finished this relation expression. Go back one row
-                            nodeRowIndex--;
+                            // If no next token
+                            if (nextToken === null) {
+                                // Add new node NOT to the list
+                                nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
 
-                            // Continue processing this token
-                            continue;
+                                // Finished this relation expression. Go back one row
+                                nodeRowIndex--;
+
+                                // Continue processing this token
+                                continue;
+                            }
+
+                            // If next token is not compare
+                            if (nextToken.tokenType !== TokenType.COMPARE_EQUAL &&
+                                nextToken.tokenType !== TokenType.COMPARE_NOT_EQUAL &&
+                                nextToken.tokenType !== TokenType.COMPARE_LESS &&
+                                nextToken.tokenType !== TokenType.COMPARE_LESS_EQUAL &&
+                                nextToken.tokenType !== TokenType.COMPARE_GREATER &&
+                                nextToken.tokenType !== TokenType.COMPARE_GREATER_EQUAL) {
+                                // Add new node NOT to the list
+                                nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
+
+                                // Finished this relation expression. Go back one row
+                                nodeRowIndex--;
+
+                                // Continue processing this token
+                                continue;
+                            }
+                        }
+
+                        // If open bracket
+                        if (token.tokenType === TokenType.OPEN_BRACKET) {
+                            // Add boolean expression node
+                            const booleanExpressionNode = new Node(NodeType.BOOL_EXPRESSION);
+
+                            // Add to node list
+                            nodeRowList[nodeRowIndex].nodeList.push(booleanExpressionNode);
+                            
+                            // Move the state on to the closing bracket boolean expression
+                            nodeRowList[nodeRowIndex].state = 5;
+
+                            // Add expression to the row
+                            nodeRowIndex++;
+                            nodeRowList[nodeRowIndex] = booleanExpressionNode;
+
+                            // Move on to the next token
+                            break;
                         }
 
                         // Add expression node
@@ -182,6 +227,9 @@ export class SqlTemplateCondition {
 
                     // If state 2 (looking for compare)
                     if (nodeRowList[nodeRowIndex].state === 2) {
+                        // If no token then something is wrong
+                        if (token === null) throw new Error('Syntax error in condition');
+
                         // If token is compare
                         if (token.tokenType === TokenType.COMPARE_EQUAL ||
                             token.tokenType === TokenType.COMPARE_NOT_EQUAL ||
@@ -230,12 +278,33 @@ export class SqlTemplateCondition {
                         // Continue processing this token
                         continue;
                     }
+
+                    // If state 5 (closing bracket)
+                    if (nodeRowList[nodeRowIndex].state === 5) {
+                        // If no token then something is wrong
+                        if (token === null) throw new Error('Syntax error in condition');
+
+                        // If token closing bracket
+                        if (token.tokenType === TokenType.CLOSE_BRACKET) {
+                            // Finished this relation expression. Go back one row
+                            nodeRowIndex--;
+
+                            // Move on to the next token
+                            break;
+                        }
+
+                        // Something has gone wrong
+                        throw new Error('Missing closing bracket');
+                    }
                 }
 
                 // If processing expression
                 if (nodeRowList[nodeRowIndex].nodeType === NodeType.EXPRESSION) {
                     // If state 0 (looking for -)
                     if (nodeRowList[nodeRowIndex].state === 0) {
+                        // If no token then something is wrong
+                        if (token === null) throw new Error('Syntax error in condition');
+
                         // If token in SUBTRACT
                         if (token.tokenType === TokenType.SUBTRACT) {
                             // Add new node SUBTRACT to the list
@@ -276,23 +345,26 @@ export class SqlTemplateCondition {
 
                     // If state 2 (looking for add/sub)
                     if (nodeRowList[nodeRowIndex].state === 2) {
-                        // If token add or sub
-                        if (token.tokenType === TokenType.ADD || token.tokenType === TokenType.SUBTRACT) {
-                            // Add new node to the list
-                            nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
+                        // If token
+                        if (token !== null) {
+                            // If token add or sub
+                            if (token.tokenType === TokenType.ADD || token.tokenType === TokenType.SUBTRACT) {
+                                // Add new node to the list
+                                nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
 
-                            // Move the state on to the looking for term
-                            nodeRowList[nodeRowIndex].state = 1;
+                                // Move the state on to the looking for term
+                                nodeRowList[nodeRowIndex].state = 1;
 
-                            // Move on to the next token
-                            break;
-                        } else {
-                            // Must have finish the expression
-                            nodeRowIndex--;
-
-                            // Continue processing this token
-                            continue;
+                                // Move on to the next token
+                                break;
+                            }
                         }
+
+                        // Must have finish the expression
+                        nodeRowIndex--;
+
+                        // Continue processing this token
+                        continue;
                     }                    
                 }
 
@@ -319,23 +391,26 @@ export class SqlTemplateCondition {
 
                     // If state 1 (looking for multiple/divide)
                     if (nodeRowList[nodeRowIndex].state === 1) {
-                        // If token multiple or divide
-                        if (token.tokenType === TokenType.MULTIPLE || token.tokenType === TokenType.DIVIDE) {
-                            // Add new node to the list
-                            nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
+                        // If token
+                        if (token !== null) {
+                            // If token multiple or divide
+                            if (token.tokenType === TokenType.MULTIPLE || token.tokenType === TokenType.DIVIDE) {
+                                // Add new node to the list
+                                nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
 
-                            // Move the state on to the looking for factor
-                            nodeRowList[nodeRowIndex].state = 0;
+                                // Move the state on to the looking for factor
+                                nodeRowList[nodeRowIndex].state = 0;
 
-                            // Move on to the next token
-                            break;
-                        } else {
-                            // Must have finish the term
-                            nodeRowIndex--;
-
-                            // Continue processing this token
-                            continue;
+                                // Move on to the next token
+                                break;
+                            }
                         }
+
+                        // Must have finish the term
+                        nodeRowIndex--;
+
+                        // Continue processing this token
+                        continue;
                     }                    
                 }
 
@@ -343,10 +418,15 @@ export class SqlTemplateCondition {
                 if (nodeRowList[nodeRowIndex].nodeType === NodeType.FACTOR) {
                     // If state identifier, variable or open bracket
                     if (nodeRowList[nodeRowIndex].state === 0) {
+                        // If no token then something is wrong
+                        if (token === null) throw new Error('Syntax error in condition');
+
                         // If TEXT, NUMBER, NULL or IDENTIFIER
                         if (token.tokenType === TokenType.TEXT ||
                             token.tokenType === TokenType.NUMBER ||
                             token.tokenType === TokenType.NULL ||
+                            token.tokenType === TokenType.TRUE ||
+                            token.tokenType === TokenType.FALSE ||
                             token.tokenType === TokenType.IDENTIFIER) {
                             // Add new node to the list
                             nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
@@ -368,7 +448,7 @@ export class SqlTemplateCondition {
                         }
 
                         // Syntax error
-                        throw new Error('Syntax error. Expected text, number, identifier or open bracket');
+                        throw new Error('Syntax error in condition');
                     }
 
                     // If state 1 (looking for express)
@@ -392,6 +472,9 @@ export class SqlTemplateCondition {
 
                     // If state 2 (looking closing bracket)
                     if (nodeRowList[nodeRowIndex].state === 2) {
+                        // If no token then something is wrong
+                        if (token === null) throw new Error('Syntax error in condition');
+
                         // If token CLOSE BRACKET
                         if (token.tokenType === TokenType.CLOSE_BRACKET) {
                             // Must have finish the factor
@@ -402,372 +485,11 @@ export class SqlTemplateCondition {
                         }
                     }                    
                 }
+
+                // Should not get here
+                throw new Error('Syntax error in condition');
             }
         }
-    }
-
-    /**
-     * Create the condition token list. This is a quick method of getting the tokens. The tokens are as follows:
-     * white space,(,),$value,=,==,===,>=,<=,>,<,!=,!==,!,+,-,*,/,"string",'string',number,&&,||,true,false,null
-     * @param {String} text The text to get the tokens from.
-     * @return {String[]} List of tokens.
-     */
-    static _createConditionTokenList(text) {
-        // Create token list
-        const tokenList = [];
-
-        // Set token type
-        let tokenType = 0;
-
-        // Set token start index
-        let tokenStartIndex = 0;
-
-        // Set character index
-        let characterIndex = 0;
-
-        // Loop until done
-        while (true) {
-            // Check limits
-            if (characterIndex >= text.length) break;
-
-            // Get character
-            const character = text.charAt(characterIndex);
-
-            // If unknown token type
-            if (tokenType === 0) {
-                // If white space then skip
-                if (character === ' ' ||
-                    character === '\t') {
-                    // Increase to the next character
-                    characterIndex++;
-
-                    // Continue on to the next character and token
-                    continue;
-                }
-
-                // If single character tokens
-                if (character === '(') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_OPEN_BRACKET); characterIndex++; continue; }
-                if (character === ')') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_CLOSE_BRACKET); characterIndex++; continue; }
-                if (character === '+') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_ADD); characterIndex++; continue; }
-                if (character === '-') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_SUBTRACT); characterIndex++; continue; }
-                if (character === '*') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_MULTIPLE); characterIndex++; continue; }
-                if (character === '/') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_DIVIDE); characterIndex++; continue; }
-
-                // If start of identifier
-                if (character === '$') {
-                    // Set index of start of token
-                    tokenStartIndex = characterIndex;
-
-                    // Set token type to identifier (1)
-                    tokenType = 1;
-
-                    // Increase to the next character
-                    characterIndex++;
-
-                    // Continue reading in the identifier
-                    continue;
-                }
-
-                // If start of string (single quote)
-                if (character === '\'') {
-                    // Set index of start of token
-                    tokenStartIndex = characterIndex;
-
-                    // Set token type to single quote (2)
-                    tokenType = 2;
-
-                    // Increase to the next character
-                    characterIndex++;
-
-                    // Continue reading in the variable
-                    continue;
-                }
-
-                // If start of string (double quote)
-                if (character === '\"') {
-                    // Set index of start of token
-                    tokenStartIndex = characterIndex;
-
-                    // Set token type to single quote (3)
-                    tokenType = 3;
-
-                    // Increase to the next character
-                    characterIndex++;
-
-                    // Continue reading in the variable
-                    continue;
-                }
-
-                // Set next 2 characters
-                let characterP1 = 0;
-                let characterP2 = 0;
-                if (characterIndex + 1 < text.length) characterP1 = text.charAt(characterIndex + 1);
-                if (characterIndex + 2 < text.length) characterP2 = text.charAt(characterIndex + 2);
-
-                // If start of hex number
-                if (character >= '0' && (characterP1 <= 'x' || characterP1 <= 'X')) {
-                    // Set index of start of token
-                    tokenStartIndex = characterIndex;
-
-                    // Set token type to hex number (5)
-                    tokenType = 5;
-
-                    // Increase to the next character
-                    characterIndex += 2;
-
-                    // Continue reading in the number
-                    continue;
-                }
-
-                // If start of number
-                if (character >= '0' && character <= '9') {
-                    // Set index of start of token
-                    tokenStartIndex = characterIndex;
-
-                    // Set token type to number (4)
-                    tokenType = 4;
-
-                    // Increase to the next character
-                    characterIndex++;
-
-                    // Continue reading in the number
-                    continue;
-                }
-
-                // Check 3 character tokens
-                if (character === '=' && characterP1 === '=' && characterP2 === '=') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_COMPARE_EQUAL); characterIndex += 3; continue; }
-                if (character === '!' && characterP1 === '=' && characterP2 === '=') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_COMPARE_NOT_EQUAL); characterIndex += 3; continue; }
-
-                // Check 2 character tokens
-                if (character === '=' && characterP1 === '=') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_COMPARE_EQUAL); characterIndex += 2; continue; }
-                if (character === '!' && characterP1 === '=') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_COMPARE_NOT_EQUAL); characterIndex += 2; continue; }
-                if (character === '>' && characterP1 === '=') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_COMPARE_GREATER_EQUAL); characterIndex += 2; continue; }
-                if (character === '<' && characterP1 === '=') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_COMPARE_LESS_EQUAL); characterIndex += 2; continue; }
-                if (character === '&' && characterP1 === '&') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_AND); characterIndex += 2; continue; }
-                if (character === '|' && characterP1 === '|') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_OR); characterIndex += 2; continue; }
-
-                // Check 1 character token
-                if (character === '=') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_COMPARE_EQUAL); characterIndex++; continue; }
-                if (character === '!') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_NOT); characterIndex++; continue; }
-                if (character === '>') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_COMPARE_GREATER); characterIndex++; continue; }
-                if (character === '<') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_COMPARE_LESS); characterIndex++; continue; }
-
-                // If true
-                if (character === 't' || character === 'T') {
-                    if (characterP1 === 'r' || characterP1 === 'R') {
-                        if (characterP2 === 'u' || characterP2 === 'U') {
-                            if (characterIndex + 3 < text.length) {
-                                const characterP3 = text.charAt(characterIndex + 3);
-                                if (characterP3 === 'e' || characterP3 === 'E') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_TRUE); characterIndex += 4; continue; }
-                            }
-                        }
-                    }
-                }
-
-                // If false
-                if (character === 'f' || character === 'F') {
-                    if (characterP1 === 'a' || characterP1 === 'A') {
-                        if (characterP2 === 'l' || characterP2 === 'L') {
-                            if (characterIndex + 4 < text.length) {
-                                const characterP3 = text.charAt(characterIndex + 3);
-                                const characterP4 = text.charAt(characterIndex + 4);
-                                if (characterP3 === 's' || characterP3 === 'S') { 
-                                    if (characterP4 === 'e' || characterP4 === 'E') { SqlTools._conditionAddToken(tokenList, SqlTools.TOKEN_FALSE); characterIndex += 5; continue; }
-                                }                                    
-                            }
-                        }
-                    }
-                }
-
-                // If we got here then there must be an error
-                throw new Error('Syntax error. Unknown token starting at: ' + text.substring(characterIndex));
-            }
-
-            // If token type is identifier
-            if (tokenType === 1) {
-                // If part of a identifier
-                if ((character >= '0' && character <= '9') ||
-                    (character >= 'a' && character <= 'z') ||
-                    (character >= 'A' && character <= 'Z') ||
-                    (character === '_')) {
-                    // Increase character index and read the next identifier character
-                    characterIndex++;
-                    continue;
-                }
-
-                // Set value
-                const value = text.substring(tokenStartIndex, characterIndex)
-
-                // We have come to the end of the identifier. Add token identifier to the list with value
-                SqlTools._conditionAddTokenWithText(tokenList, SqlTools.TOKEN_IDENTIFIER, value);
-
-                // Change the token type to unknown and reprocess this character
-                tokenType = 0;
-                continue;
-            }
-
-            // If token type is string (single quote)
-            if (tokenType === 2) {
-                // If \'
-                if (character === '\\') {
-                    // If not reached the end
-                    if (characterIndex + 1 < text.length) {
-                        // If ' character
-                        if (text.charAt(characterIndex + 1) === '\'') {
-                            // Increase character index and read the next string character
-                            characterIndex += 2;
-                            continue;
-                        }
-                    }
-                }
-
-                // If not single quote
-                if (character !== '\'') {
-                    // Increase character index and read the next string character
-                    characterIndex++;
-                    continue;
-                }
-
-                // Set value
-                const value = text.substring(tokenStartIndex + 1, characterIndex);
-
-                // We have come to the end of the string. Add token text to the list with value
-                SqlTools._conditionAddTokenWithValue(tokenList, SqlTools.TOKEN_TEXT, value);
-
-                // Change the token type to unknown and move on to the next character
-                tokenType = 0;
-                characterIndex++;
-                continue;
-            }
-
-            // If token type is string (double quote)
-            if (tokenType === 3) {
-                // If \"
-                if (character === '\\') {
-                    // If not reached the end
-                    if (characterIndex + 1 < text.length) {
-                        // If ' character
-                        if (text.charAt(characterIndex + 1) === '\"') {
-                            // Increase character index and read the next string character
-                            characterIndex += 2;
-                            continue;
-                        }
-                    }
-                }
-
-                // If not double quote
-                if (character !== '\"') {
-                    // Increase character index and read the next string character
-                    characterIndex++;
-                    continue;
-                }
-
-                // Set value
-                const value = text.substring(tokenStartIndex + 1, characterIndex);
-
-                // We have come to the end of the string. Add token text to the list with value
-                SqlTools._conditionAddTokenWithValue(tokenList, SqlTools.TOKEN_TEXT, value);
-
-                // Change the token type to unknown and move on to the next character
-                tokenType = 0;
-                characterIndex++;
-                continue;
-            }
-
-            // If token type is number
-            if (tokenType === 4) {
-                // If part of a number
-                if ((character >= '0' && character <= '9') || character === '.') {
-                    // Increase character index and read the next number character
-                    characterIndex++;
-                    continue;
-                }
-
-                // Set value
-                const value = parseFloat(text.substring(tokenStartIndex, characterIndex));
-
-                // We have come to the end of the number. Add token number to the list with value
-                SqlTools._conditionAddTokenWithValue(tokenList, SqlTools.TOKEN_NUMBER, value);
-
-                // Change the token type to unknown and reprocess this character
-                tokenType = 0;
-                continue;
-            }
-
-            // If token type is hex number
-            if (tokenType === 5) {
-                // If part of a number
-                if ((character >= '0' && character <= '9') ||
-                    (character >= 'A' && character <= 'F') ||
-                    (character >= 'a' && character <= 'f')) {
-                    // Increase character index and read the next number character
-                    characterIndex++;
-                    continue;
-                }
-
-                // Set value
-                const value = Number(text.substring(tokenStartIndex, characterIndex));
-
-                // We have come to the end of the number. Add token number to the list with value
-                SqlTools._conditionAddTokenWithValue(tokenList, SqlTools.TOKEN_NUMBER, value);
-
-                // Change the token type to unknown and reprocess this character
-                tokenType = 0;
-                continue;
-            }
-        }
-
-        // If still in the middle of reading a identifier
-        if (tokenType === 1) {
-            // Finish adding the identifier token to the list with value
-            SqlTools._conditionAddTokenWithValue(tokenList, SqlTools.TOKEN_IDENTIFIER, text.substring(tokenStartIndex));
-        }
-
-        // If still in the middle of reading a string
-        if (tokenType === 2 || tokenType === 3) {
-            // There must be something wrong
-            throw new Error('Missing closing string quotation mark');
-        }
-
-        // If still in the middle of reading a number
-        if (tokenType === 4) {
-            // Finish adding the number token to the list with value
-            SqlTools._conditionAddTokenWithValue(tokenList, SqlTools.TOKEN_NUMBER, parseFloat(text.substring(tokenStartIndex)));
-        }
-
-        // If still in the middle of reading a hex number
-        if (tokenType === 5) {
-            // Finish adding the number token to the list with value
-            SqlTools._conditionAddTokenWithValue(tokenList, SqlTools.TOKEN_NUMBER, Number(text.substring(tokenStartIndex)));
-        }
-
-        // Return the token list
-        return tokenList;
-    }
-
-    static _conditionAddToken(list, type) {
-        // Create token
-        const token = {};
-
-        // Set type
-        token.tokenType = type;
-
-        // Add to list
-        list.push(token);
-    }
-
-    static _conditionAddTokenWithValue(list, type, value) {
-        // Create token
-        const token = {};
-
-        // Set type
-        token.tokenType = type;
-
-        // Set value
-        token.value = value;
-
-        // Add to list
-        list.push(token);
     }
 
     /**
@@ -862,11 +584,11 @@ export class SqlTemplateCondition {
                 // Set next 2 characters
                 let character2 = 0;
                 let character3 = 0;
-                if (this._tokenIndex + 1 < this._condition.length) character2 = this._condition.charAt(this._tokenIndex + 1);
-                if (this._tokenIndex + 2 < this._condition.length) character3 = this._condition.charAt(this._tokenIndex + 2);
+                if (this._tokenIndex < this._condition.length) character2 = this._condition.charAt(this._tokenIndex);
+                if (this._tokenIndex + 1 < this._condition.length) character3 = this._condition.charAt(this._tokenIndex + 1);
 
                 // If start of hex number
-                if (character >= '0' && (character2 <= 'x' || character2 <= 'X')) {
+                if (character === '0' && (character2 === 'x' || character2 === 'X')) {
                     // Set token type to number
                     tokenType = TokenType.NUMBER;
 
@@ -895,6 +617,16 @@ export class SqlTemplateCondition {
                 // Check 3 character tokens
                 if (character === '=' && character2 === '=' && character3 === '=') { tokenType = TokenType.COMPARE_EQUAL; this._tokenIndex += 2; break; }
                 if (character === '!' && character2 === '=' && character3 === '=') { tokenType = TokenType.COMPARE_NOT_EQUAL; this._tokenIndex += 2; break; }
+                
+                // Check AND
+                if ((character === 'a' || character === 'A') && 
+                    (character2 === 'n' || character2 === 'N') &&
+                    (character3 === 'd' || character3 === 'D')) {
+                    // Set token, increase token index and move on
+                    tokenType = TokenType.AND;
+                    this._tokenIndex += 2;
+                    break;
+                }
 
                 // Check 2 character tokens
                 if (character === '=' && character2 === '=') { tokenType = TokenType.COMPARE_EQUAL; this._tokenIndex++; break; }
@@ -904,6 +636,15 @@ export class SqlTemplateCondition {
                 if (character === '<' && character2 === '=') { tokenType = TokenType.COMPARE_LESS_EQUAL; this._tokenIndex++; break; }
                 if (character === '&' && character2 === '&') { tokenType = TokenType.AND; this._tokenIndex++; break; }
                 if (character === '|' && character2 === '|') { tokenType = TokenType.OR; this._tokenIndex++; break; }
+
+                // If OR
+                if ((character === 'o' || character === 'O') && 
+                    (character2 === 'r' || character2 === 'R')) {
+                    // Set token, increase token index and move on
+                    tokenType = TokenType.OR;
+                    this._tokenIndex++;
+                    break;
+                }
 
                 // Check 1 character token
                 if (character === '=') { tokenType = TokenType.COMPARE_EQUAL; break; }
@@ -915,9 +656,9 @@ export class SqlTemplateCondition {
                 if (character === 'n' || character === 'N') {
                     if (character2 === 'u' || character2 === 'U') {
                         if (character3 === 'l' || character3 === 'L') {
-                            if (this._tokenIndex + 3 < this._condition.length) {
-                                const character4 = this._condition.charAt(this._tokenIndex + 3);
-                                if (character4 === 'l' || character4 === 'l') { tokenType = TokenType.NULL; this._tokenIndex += 3; break; }
+                            if (this._tokenIndex + 2 < this._condition.length) {
+                                const character4 = this._condition.charAt(this._tokenIndex + 2);
+                                if (character4 === 'l' || character4 === 'L') { tokenType = TokenType.NULL; this._tokenIndex += 3; break; }
                             }
                         }
                     }
@@ -927,8 +668,8 @@ export class SqlTemplateCondition {
                 if (character === 't' || character === 'T') {
                     if (character2 === 'r' || character2 === 'R') {
                         if (character3 === 'u' || character3 === 'U') {
-                            if (this._tokenIndex + 3 < this._condition.length) {
-                                const character4 = this._condition.charAt(this._tokenIndex + 3);
+                            if (this._tokenIndex + 2 < this._condition.length) {
+                                const character4 = this._condition.charAt(this._tokenIndex + 2);
                                 if (character4 === 'e' || character4 === 'E') { tokenType = TokenType.TRUE; this._tokenIndex += 3; break; }
                             }
                         }
@@ -939,15 +680,18 @@ export class SqlTemplateCondition {
                 if (character === 'f' || character === 'F') {
                     if (character2 === 'a' || character2 === 'A') {
                         if (character3 === 'l' || character3 === 'L') {
-                            if (this._tokenIndex + 4 < this._condition.length) {
-                                const character4 = this._condition.charAt(this._tokenIndex + 3);
-                                const character5 = this._condition.charAt(this._tokenIndex + 4);
+                            if (this._tokenIndex + 3 < this._condition.length) {
+                                const character4 = this._condition.charAt(this._tokenIndex + 2);
+                                const character5 = this._condition.charAt(this._tokenIndex + 3);
                                 if ((character4 === 's' || character4 === 'S') ||
                                     (character5 === 'e' || character5 === 'E')) { tokenType = TokenType.FALSE; this._tokenIndex += 4; break; }
                             }
                         }
                     }
                 }
+
+                // If we got here then there must be an error
+                throw new Error('Syntax error. Unknown token starting at: ' + this._condition.substring(this._tokenIndex - 1));
             }
 
             // If reading identifier
@@ -1005,7 +749,7 @@ export class SqlTemplateCondition {
                 } else {
                     // If part of a number
                     if ((character >= '0' && character <= '9') || character === '.') {
-                        // Continue to read the next hex number character
+                        // Continue to read the next number character
                         continue;
                     }
                 }
@@ -1044,11 +788,11 @@ export class SqlTemplateCondition {
         // If token is text
         if (tokenType === TokenType.TEXT) {
             // Get final text
-            const text = this._condition.substring(startTokenIndex + 1, this._tokenIndex);
+            let text = this._condition.substring(startTokenIndex + 1, this._tokenIndex - 1);
 
             // Check and process escape characters
             if (text.indexOf('\\"') !== -1) text = text.replace('\\"', '\"');
-            if (text.indexOf('\\"') !== -1) text = text.replace('\\"', '\"');
+            if (text.indexOf('\\\'') !== -1) text = text.replace('\\\'', '\'');
             if (text.indexOf('\\n') !== -1) text = text.replace('\\n', '\n');
             if (text.indexOf('\\r') !== -1) text = text.replace('\\r', '\r');
             if (text.indexOf('\\t') !== -1) text = text.replace('\\t', '\t');
@@ -1059,13 +803,16 @@ export class SqlTemplateCondition {
 
         // If token in number
         if (tokenType === TokenType.NUMBER) {
+            // Get final text
+            const text = this._condition.substring(startTokenIndex, this._tokenIndex);
+
             // If hex number
             if (isHex === true) {
                 // Convert into number from hex
-                token.value = Number(this._condition.substring(startTokenIndex, this._tokenIndex));
+                token.value = Number(text);
             } else {
                 // Convert into number
-                token.value = parseFloat(this._condition.substring(startTokenIndex, this._tokenIndex));
+                token.value = parseFloat(text);
             }
         }
 
@@ -1073,11 +820,37 @@ export class SqlTemplateCondition {
         return token;
     }
 
+    /**
+     * Get the next token but do not increase the token index. This looks ahead to see what
+     * the next token is without changing what calling _getNextToken will return.
+     */
+    _pollNextToken() {
+        // Save token index
+        const currentTokenIndex = this._tokenIndex;
+
+        // Get next token
+        const token = this._getNextToken();
+
+        // Reset the token index to the last one
+        this._tokenIndex = currentTokenIndex;
+
+        // Return the next token
+        return token;
+    }
+
+    /**
+     * Get the node's value.
+     * @param {Node} node The node to get the value for.
+     * @return {String|Number|Boolean} Some value relating to the node.
+     */
     _getNodeValue(node) {
         // If node is boolean expression
         if (node.nodeType === NodeType.BOOL_EXPRESSION) {
             // Set boolean value
             let booleanValue = null;
+
+            // Set last boolean token type
+            let lastBooleanTokenType = null;
 
             // Set last child result
             let lastChildResult = true;
@@ -1094,19 +867,28 @@ export class SqlTemplateCondition {
 
                     // If boolean value not set yet
                     if (booleanValue === null) booleanValue = lastChildResult;
+
+                    // If last boolean token used
+                    if (lastBooleanTokenType !== null) {
+                        // If last was AND
+                        if (lastBooleanTokenType === TokenType.AND) {
+                            // AND the boolean value with the last child result
+                            booleanValue = booleanValue && lastChildResult;
+                        }
+
+                        // If last was OR
+                        if (lastBooleanTokenType === TokenType.OR) {
+                            // OR the boolean value with the last child result
+                            booleanValue = booleanValue || lastChildResult;
+                        }
+                    }
                     continue;
                 }
 
-                // If AND
-                if (node.token.tokenType === TokenType.AND) {
-                    // Add the boolean value with the last child result
-                    booleanValue = booleanValue && lastChildResult;
-                }
-
-                // If OR
-                if (node.token.tokenType === TokenType.OR) {
-                    // And the boolean value with the last child result
-                    booleanValue = booleanValue || lastChildResult;
+                // If AND or OR
+                if (childNode.token.tokenType === TokenType.AND || childNode.token.tokenType === TokenType.OR) {
+                    // Set the last boolean token type
+                    lastBooleanTokenType = childNode.token.tokenType;
                 }
             }
 
@@ -1121,6 +903,9 @@ export class SqlTemplateCondition {
                 // Get child node
                 const childNode = node.nodeList[0];
 
+                // If bool expression
+                if (childNode.nodeType === NodeType.BOOL_EXPRESSION) return this._getNodeValue(childNode);
+
                 // Check if true or false
                 if (childNode.token.tokenType === TokenType.TRUE) return true;
                 if (childNode.token.tokenType === TokenType.FALSE) return false;
@@ -1134,6 +919,9 @@ export class SqlTemplateCondition {
                 // Check if true or false (it starts with a NOT, so swap)
                 if (childNode.token.tokenType === TokenType.TRUE) return false;
                 if (childNode.token.tokenType === TokenType.FALSE) return true;
+
+                // If bool expression (not the result)
+                if (childNode.nodeType === NodeType.BOOL_EXPRESSION) return !this._getNodeValue(childNode);
             }
 
             // If three nodes
@@ -1184,6 +972,9 @@ export class SqlTemplateCondition {
             // Set expression value
             let expressionValue = null;
 
+            // Set last expression token type
+            let lastExpressionTokenType = null;
+
             // Set negate
             let negate = false;
 
@@ -1205,7 +996,7 @@ export class SqlTemplateCondition {
                 // If term
                 if (childNode.nodeType === NodeType.TERM) {
                     // Get term value
-                    const termValue = this._getNodeValue(childNode);
+                    let termValue = this._getNodeValue(childNode);
 
                     // If negate required
                     if (negate === true) {
@@ -1221,19 +1012,28 @@ export class SqlTemplateCondition {
 
                     // If expression value not set yet
                     if (expressionValue === null) expressionValue = lastChildResult;
+
+                    // If last expression token used
+                    if (lastExpressionTokenType !== null) {
+                        // If last was ADD
+                        if (lastExpressionTokenType === TokenType.ADD) {
+                            // ADD the expression value with the last child result
+                            expressionValue = expressionValue + lastChildResult;
+                        }
+
+                        // If last was SUBTRACT
+                        if (lastExpressionTokenType === TokenType.SUBTRACT) {
+                            // SUBTRACT the expression value with the last child result
+                            expressionValue = expressionValue - lastChildResult;
+                        }
+                    }
                     continue;
                 }
 
-                // If subtraction
-                if (childNode.token.tokenType === TokenType.SUBTRACT) {
-                    // Subtract the expression value with the last child result
-                    expressionValue = expressionValue - lastChildResult;
-                }
-
-                // If add
-                if (childNode.token.tokenType === TokenType.ADD) {
-                    // Add the expression value with the last child result
-                    expressionValue = expressionValue + lastChildResult;
+                // If add or subtraction
+                if (childNode.token.tokenType === TokenType.ADD || childNode.token.tokenType === TokenType.SUBTRACT) {
+                    // Set the last expression token type
+                    lastExpressionTokenType = childNode.token.tokenType;
                 }
             }
 
@@ -1245,6 +1045,9 @@ export class SqlTemplateCondition {
         if (node.nodeType === NodeType.TERM) {
             // Set term value
             let termValue = null;
+
+            // Set last term token type
+            let lastTermTokenType = null;
 
             // Set last child result
             let lastChildResult = 0;
@@ -1264,19 +1067,28 @@ export class SqlTemplateCondition {
 
                     // If term value not set yet
                     if (termValue === null) termValue = lastChildResult;
+
+                    // If last term token used
+                    if (lastTermTokenType !== null) {
+                        // If last was MULTIPLE
+                        if (lastTermTokenType === TokenType.MULTIPLE) {
+                            // MULTIPLE the term value with the last child result
+                            termValue = termValue * lastChildResult;
+                        }
+
+                        // If last was DIVIDE
+                        if (lastTermTokenType === TokenType.DIVIDE) {
+                            // DIVIDE the term value with the last child result
+                            termValue = termValue / lastChildResult;
+                        }
+                    }
                     continue;
                 }
 
-                // If multiple
-                if (childNode.token.tokenType === TokenType.MULTIPLE) {
-                    // Multiple the expression value with the last child result
-                    expressionValue = expressionValue * lastChildResult;
-                }
-
-                // If divide
-                if (childNode.token.tokenType === TokenType.DIVIDE) {
-                    // Divide the expression value with the last child result
-                    expressionValue = expressionValue / lastChildResult;
+                // If multiple or divide
+                if (childNode.token.tokenType === TokenType.MULTIPLE || childNode.token.tokenType === TokenType.DIVIDE) {
+                    // Set the last term token type
+                    lastTermTokenType = childNode.token.tokenType
                 }
             }
 
@@ -1295,14 +1107,16 @@ export class SqlTemplateCondition {
                 if (childNode.token.tokenType === TokenType.TEXT) return childNode.token.value;
                 if (childNode.token.tokenType === TokenType.NUMBER) return childNode.token.value;
                 if (childNode.token.tokenType === TokenType.NULL) return null;
+                if (childNode.token.tokenType === TokenType.TRUE) return true;
+                if (childNode.token.tokenType === TokenType.FALSE) return false;
 
                 // If identifier
                 if (childNode.token.tokenType === TokenType.IDENTIFIER) {
                     // Set property name
                     const propertyName = childNode.token.value.substring(1);
 
-                    // If the property does not exist
-                    if (typeof this._values[propertyName] === 'undefined') throw new Error('Unknown identifier ' + childNode.token.value);
+                    // If the property does not exist then return null
+                    if (typeof this._values[propertyName] === 'undefined') return null;
 
                     // Get value
                     const value = this._values[propertyName];
@@ -1342,7 +1156,7 @@ export class SqlTemplateCondition {
         let second = 0;
 
         // If UTC
-        if (this._utc) {
+        if (this._utc === true) {
             // Get UTC date and time values
             year = date.getUTCFullYear();
             month = date.getUTCMonth() + 1;
@@ -1387,7 +1201,7 @@ export class SqlTemplateCondition {
         if (secondText.length === 1) secondText = '0' + secondText;
 
         // Format SQL date time
-        const sqlText = yearText + monthText + dayText + hourText + minuteText + secondText;
+        const sqlText = yearText + '-' + monthText + '-' + dayText + ' ' + hourText + ':' + minuteText + ':' + secondText;
         
         // Return formatted SQL date time
         return sqlText;

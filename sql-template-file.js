@@ -2,7 +2,7 @@
  * SQL Template File
  * Used for loading in SQL templates.
  */
-export default class SqlTemplateFile {
+export class SqlTemplateFile {
     /**
      * Template map. The cache of templates
      */

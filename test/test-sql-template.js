@@ -2,7 +2,6 @@
  * Test SQL Tools.
  */
 import Test from "./test.js";
-import SqlTools from "../sql-tools.js";
 import { SqlTemplate } from "../sql-template.js";
 import { BlockType } from "../block.js";
 

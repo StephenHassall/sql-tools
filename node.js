@@ -13,10 +13,8 @@ export class NodeType {
     static BOOL_EXPRESSION = 2;
     static RELATION_EXPRESSION = 3;
     static EXPRESSION = 4;
-    static COMPARE = 5;
-    static TERM = 6;
-    static FACTOR = 7;
-    static VARIABLE = 8;
+    static TERM = 5;
+    static FACTOR = 6;
 }
 
 /**

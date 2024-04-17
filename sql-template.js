@@ -15,7 +15,7 @@
 import { Block } from "./block.js";
 import { BlockType } from "./block.js";
 
-export default class SqlTemplate {
+export class SqlTemplate {
     /**
      * SQL template constructor.
      * @param {String} [template] The template to setup the SQL template with.
