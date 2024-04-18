@@ -4,6 +4,7 @@
  */
 import { Node } from "./node.js";
 import { NodeType } from "./node.js";
+import { SqlConvert } from "./sql-convert.js";
 import { Token } from "./token.js";
 import { TokenType } from "./token.js";
 
@@ -125,32 +126,8 @@ export class SqlTemplateCondition {
 
                 // If processing relation expression
                 if (nodeRowList[nodeRowIndex].nodeType === NodeType.RELATION_EXPRESSION) {
-                    // If state 0 (looking for NOT)
+                    // If state 0 (looking for true, false, not, identifier (, or expression)
                     if (nodeRowList[nodeRowIndex].state === 0) {
-                        // If no token then something is wrong
-                        if (token === null) throw new Error('Syntax error in condition');
-
-                        // If token in not
-                        if (token.tokenType === TokenType.NOT) {
-                            // Add new node NOT to the list
-                            nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
-
-                            // Increase state to then next part
-                            nodeRowList[nodeRowIndex].state++;
-
-                            // Move on to the next token
-                            break;
-                        }
-
-                        // Set state to the next part
-                        nodeRowList[nodeRowIndex].state = 1;
-
-                        // Continue processing this token
-                        continue;
-                    }
-
-                    // If state 1 (looking for true, false, (, or expression)
-                    if (nodeRowList[nodeRowIndex].state === 1) {
                         // If no token then something is wrong
                         if (token === null) throw new Error('Syntax error in condition');
 
@@ -161,7 +138,7 @@ export class SqlTemplateCondition {
 
                             // If no next token
                             if (nextToken === null) {
-                                // Add new node NOT to the list
+                                // Add new node to the list
                                 nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
 
                                 // Finished this relation expression. Go back one row
@@ -178,7 +155,67 @@ export class SqlTemplateCondition {
                                 nextToken.tokenType !== TokenType.COMPARE_LESS_EQUAL &&
                                 nextToken.tokenType !== TokenType.COMPARE_GREATER &&
                                 nextToken.tokenType !== TokenType.COMPARE_GREATER_EQUAL) {
-                                // Add new node NOT to the list
+                                // Add new node to the list
+                                nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
+
+                                // Finished this relation expression. Go back one row
+                                nodeRowIndex--;
+
+                                // Continue processing this token
+                                continue;
+                            }
+                        }
+
+                        // If NOT
+                        if (token.tokenType === TokenType.NOT) {
+                            // Poll the next token
+                            const nextToken = this._pollNextToken();
+
+                            // If token
+                            if (nextToken !== null) {
+                                // If IDENTIFIER
+                                if (nextToken.tokenType === TokenType.IDENTIFIER) {
+                                    // Add new node to the list
+                                    nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
+
+                                    // Move on to the next token
+                                    break;
+                                }
+                            }
+
+                            // Should not get here
+                            throw new Error('Syntax error in condition');
+                        }
+
+                        // If IDENTIFIER
+                        if (token.tokenType === TokenType.IDENTIFIER) {
+                            // Poll the next token
+                            const nextToken = this._pollNextToken();
+
+                            // If no next token
+                            if (nextToken === null) {
+                                // Add new node to the list
+                                nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
+
+                                // Finished this relation expression. Go back one row
+                                nodeRowIndex--;
+
+                                // Continue processing this token
+                                continue;
+                            }
+
+                            // If next token is not compare or term/factor part
+                            if (nextToken.tokenType !== TokenType.COMPARE_EQUAL &&
+                                nextToken.tokenType !== TokenType.COMPARE_NOT_EQUAL &&
+                                nextToken.tokenType !== TokenType.COMPARE_LESS &&
+                                nextToken.tokenType !== TokenType.COMPARE_LESS_EQUAL &&
+                                nextToken.tokenType !== TokenType.COMPARE_GREATER &&
+                                nextToken.tokenType !== TokenType.COMPARE_GREATER_EQUAL &&
+                                nextToken.tokenType !== TokenType.ADD &&
+                                nextToken.tokenType !== TokenType.SUBTRACT &&
+                                nextToken.tokenType !== TokenType.MULTIPLE &&
+                                nextToken.tokenType !== TokenType.DIVIDE) {
+                                // Add new node to the list
                                 nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
 
                                 // Finished this relation expression. Go back one row
@@ -198,7 +235,7 @@ export class SqlTemplateCondition {
                             nodeRowList[nodeRowIndex].nodeList.push(booleanExpressionNode);
                             
                             // Move the state on to the closing bracket boolean expression
-                            nodeRowList[nodeRowIndex].state = 5;
+                            nodeRowList[nodeRowIndex].state = 4;
 
                             // Add expression to the row
                             nodeRowIndex++;
@@ -215,7 +252,7 @@ export class SqlTemplateCondition {
                         nodeRowList[nodeRowIndex].nodeList.push(expressionNode);
                         
                         // Move the state on to the first expression
-                        nodeRowList[nodeRowIndex].state = 2;
+                        nodeRowList[nodeRowIndex].state = 1;
 
                         // Add expression to the row
                         nodeRowIndex++;
@@ -226,7 +263,7 @@ export class SqlTemplateCondition {
                     }
 
                     // If state 2 (looking for compare)
-                    if (nodeRowList[nodeRowIndex].state === 2) {
+                    if (nodeRowList[nodeRowIndex].state === 1) {
                         // If no token then something is wrong
                         if (token === null) throw new Error('Syntax error in condition');
 
@@ -241,7 +278,7 @@ export class SqlTemplateCondition {
                             nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
 
                             // Set state to the next express
-                            nodeRowList[nodeRowIndex].state = 3;
+                            nodeRowList[nodeRowIndex].state = 2;
 
                             // Move on to the next token
                             break;
@@ -252,7 +289,7 @@ export class SqlTemplateCondition {
                     }
 
                     // If state 3 (looking second expression)
-                    if (nodeRowList[nodeRowIndex].state === 3) {
+                    if (nodeRowList[nodeRowIndex].state === 2) {
                         // Add expression node
                         const expressionNode = new Node(NodeType.EXPRESSION);
 
@@ -260,7 +297,7 @@ export class SqlTemplateCondition {
                         nodeRowList[nodeRowIndex].nodeList.push(expressionNode);
                         
                         // Move the state on to the second expression
-                        nodeRowList[nodeRowIndex].state = 4;
+                        nodeRowList[nodeRowIndex].state = 3;
 
                         // Add expression to the row
                         nodeRowIndex++;
@@ -271,7 +308,7 @@ export class SqlTemplateCondition {
                     }
 
                     // If state 4 (finishing second expression)
-                    if (nodeRowList[nodeRowIndex].state === 4) {
+                    if (nodeRowList[nodeRowIndex].state === 3) {
                         // Finished this relation expression. Go back one row
                         nodeRowIndex--;
 
@@ -280,7 +317,7 @@ export class SqlTemplateCondition {
                     }
 
                     // If state 5 (closing bracket)
-                    if (nodeRowList[nodeRowIndex].state === 5) {
+                    if (nodeRowList[nodeRowIndex].state === 4) {
                         // If no token then something is wrong
                         if (token === null) throw new Error('Syntax error in condition');
 
@@ -909,19 +946,63 @@ export class SqlTemplateCondition {
                 // Check if true or false
                 if (childNode.token.tokenType === TokenType.TRUE) return true;
                 if (childNode.token.tokenType === TokenType.FALSE) return false;
+
+                // If IDENTIFIER
+                if (childNode.token.tokenType === TokenType.IDENTIFIER) {
+                    // Set property name
+                    const propertyName = childNode.token.value.substring(1);
+
+                    // If the property does not exist then return false
+                    if (typeof this._values[propertyName] === 'undefined') return false;
+
+                    // Get value
+                    const value = this._values[propertyName];
+
+                    // If null then return false
+                    if (value === null) return false;
+
+                    // If string
+                    if (typeof value === 'string') {
+                        // If the string is empty then return false
+                        if (value.length === 0) return false;
+                    }
+
+                    // If boolean then return the boolean value
+                    if (typeof value === 'boolean') return value;
+
+                    // Otherwise we have the property so return true
+                    return true;
+                }
             }
 
             // If two nodes
             if (node.nodeList.length === 2) {
-                // Get second child node
+                // Get IDENTIFIER child node (the second, the first one is NOT)
                 const childNode = node.nodeList[1];
 
-                // Check if true or false (it starts with a NOT, so swap)
-                if (childNode.token.tokenType === TokenType.TRUE) return false;
-                if (childNode.token.tokenType === TokenType.FALSE) return true;
+                // Set property name
+                const propertyName = childNode.token.value.substring(1);
 
-                // If bool expression (not the result)
-                if (childNode.nodeType === NodeType.BOOL_EXPRESSION) return !this._getNodeValue(childNode);
+                // If the property does not exist then return NOT false
+                if (typeof this._values[propertyName] === 'undefined') return true;
+
+                // Get value
+                const value = this._values[propertyName];
+
+                // If null then return NOT false
+                if (value === null) return true;
+
+                // If string
+                if (typeof value === 'string') {
+                    // If the string is empty then return NOT false
+                    if (value.length === 0) return true;
+                }
+
+                // If boolean then return the NOT boolean value
+                if (typeof value === 'boolean') return !value;
+
+                // Otherwise we have the property so return NOT true
+                return false;
             }
 
             // If three nodes
@@ -943,27 +1024,6 @@ export class SqlTemplateCondition {
 
                 // Return false otherwise
                 return false;
-            }
-
-            // If four nodes (starts with NOT)
-            if (node.nodeList.length === 4) {
-                // Get results
-                const firstResult = this._getNodeValue(node.nodeList[1]);
-                const secondResult = this._getNodeValue(node.nodeList[3]);
-
-                // Get compare token
-                const compareTokenType = node.nodeList[2].token.tokenType;
-
-                // Check compares
-                if (compareTokenType === TokenType.COMPARE_EQUAL && firstResult === secondResult) return false;
-                if (compareTokenType === TokenType.COMPARE_NOT_EQUAL && firstResult !== secondResult) return false;
-                if (compareTokenType === TokenType.COMPARE_LESS && firstResult < secondResult) return false;
-                if (compareTokenType === TokenType.COMPARE_LESS_EQUAL && firstResult <= secondResult) return false;
-                if (compareTokenType === TokenType.COMPARE_GREATER && firstResult > secondResult) return false;
-                if (compareTokenType === TokenType.COMPARE_GREATER_EQUAL && firstResult >= secondResult) return false;
-
-                // Return true otherwise
-                return true;
             }
         }
 
@@ -1125,7 +1185,7 @@ export class SqlTemplateCondition {
                     if (value === null) return null;
 
                     // If Date class
-                    if (value instanceof Date) return this._formatDate(value);
+                    if (value instanceof Date) return SqlConvert.dateToSql(value, this._utc);
 
                     // Return the value as is
                     return value;
@@ -1138,72 +1198,5 @@ export class SqlTemplateCondition {
                 return this._getNodeValue(node.nodeList[2]);
             }
         }
-    }
-
-    /**
-     * Format the date and time into an SQL text format. This uses local date time, not UTC.
-     * Format is YYYY-MM-DD HH:MM:SS.
-     * @param {Date} date The date object to convert.
-     * @return {String} The date in text format.
-     */
-    _formatDate(date) {
-        // Get date and time values
-        let year = 0;
-        let month = 0;
-        let day = 0;
-        let hour = 0;
-        let minute = 0;
-        let second = 0;
-
-        // If UTC
-        if (this._utc === true) {
-            // Get UTC date and time values
-            year = date.getUTCFullYear();
-            month = date.getUTCMonth() + 1;
-            day = date.getUTCDate();
-            hour = date.getUTCHours();
-            minute = date.getUTCMinutes();
-            second = date.getUTCSeconds();
-
-        } else {
-            // Else local
-
-            // Get local date and time values
-            year = date.getFullYear();
-            month = date.getMonth() + 1;
-            day = date.getDate();
-            hour = date.getHours();
-            minute = date.getMinutes();
-            second = date.getSeconds();
-        }
-
-        // Format years
-        let yearText = year.toString();
-
-        // Format months
-        let monthText = month.toString();
-        if (monthText.length === 1) monthText = '0' + monthText;
-        
-        // Format days
-        let dayText = day.toString();
-        if (dayText.length === 1) dayText = '0' + dayText;
-
-        // Format hours
-        let hourText = hour.toString();
-        if (hourText.length === 1) hourText = '0' + hourText;
-
-        // Format minutes
-        let minuteText = minute.toString();
-        if (minuteText.length === 1) minuteText = '0' + minuteText;
-
-        // Format seconds
-        let secondText = second.toString();
-        if (secondText.length === 1) secondText = '0' + secondText;
-
-        // Format SQL date time
-        const sqlText = yearText + '-' + monthText + '-' + dayText + ' ' + hourText + ':' + minuteText + ':' + secondText;
-        
-        // Return formatted SQL date time
-        return sqlText;
     }
 }

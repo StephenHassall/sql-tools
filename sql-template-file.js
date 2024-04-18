@@ -2,6 +2,11 @@
  * SQL Template File
  * Used for loading in SQL templates.
  */
+import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
+import Path from 'node:path';
+import { SqlTemplate } from "./sql-template.js";
+
 export class SqlTemplateFile {
     /**
      * Template map. The cache of templates
@@ -12,11 +17,12 @@ export class SqlTemplateFile {
      * Get a template that is stored within a SQL file that has the given name. There need to be a "#template [name]...#endtemplate" in the file.
      * @param {String} name The name of the template. This is used to search for the template within the file.
      * @param {String} file Either the full path to the file or (if importMetaUrl is used) the relative path to the file.
-     * @param {String} importMetaUrl The location of the module that is calling the function. This is used when working with relative paths.
+     * @param {String} [importMetaUrl] The location of the module that is calling the function. This is used when working with relative paths.
      * @param {Boolean} [cache=true] Is the template cached so that it does not need to be read from the file next time.
+     * @param {Boolean} [utc=true] When using the date object as a value, will the SQL template use the local the date and time or UTC value.
      * @return {Promise} A promise that resolves the SQL template.
      */
-    static async getTemplateByName(name, file, importMetaUrl, cache) {
+    static async getTemplateByName(name, file, importMetaUrl, cache, utc) {
         // Check cache default value
         if (cache === undefined) cache = true;
 
@@ -44,12 +50,12 @@ export class SqlTemplateFile {
             cacheKey = importMetaUrl + '-' + file + '-' + name;
 
             // If the template in the cache
-            if (SqlTools._templateCache.has(cacheKey) === true) {
-                // Get the cached template
-                const template = Sql._templateCache.get(cacheKey);
+            if (SqlTemplateFile._templateCache.has(cacheKey) === true) {
+                // Get the cached SQL template object
+                const sqlTemplate = SqlTemplateFile._templateCache.get(cacheKey);
 
-                // Return a promise that resolves the template
-                return Promise.resolve(template);
+                // Return a promise that resolves the SQL template
+                return Promise.resolve(sqlTemplate);
             }
         }
 
@@ -65,7 +71,7 @@ export class SqlTemplateFile {
         // If not found
         if (startIndex === -1) {
             // Return a rejected promise
-            return Promise.reject('Template not found');
+            return Promise.reject(Error('Template not found'));
         }
 
         // Look for end of template
@@ -74,7 +80,7 @@ export class SqlTemplateFile {
         // If not found
         if (endIndex === -1) {
             // Return a rejected promise
-            return Promise.reject('Missing endtemplate');
+            return Promise.reject(Error('Missing endtemplate'));
         }
 
         // Adjust start of index
@@ -91,24 +97,28 @@ export class SqlTemplateFile {
         // Get the template
         const template = fileData.substring(startIndex, endIndex);
 
+        // Create the SQL template
+        const sqlTemplate = new SqlTemplate(template, utc);
+
         // If cache being used
         if (cache === true) {
-            // Add the template to the cache
-            SqlTools._templateCache.set(cacheKey, template);
+            // Add the SQL template to the cache
+            SqlTemplateFile._templateCache.set(cacheKey, sqlTemplate);
         }
 
-        // Return a promise with the resolved template
-        return Promise.resolve(template);
+        // Return a promise with the resolved SQL template
+        return Promise.resolve(sqlTemplate);
     }
 
     /**
      * Get a SQL template from a file (or cache).
      * @param {String} file Either the full path to the file or (if importMetaUrl is used) the relative path to the file.
-     * @param {String} importMetaUrl The location of the module that is calling the function. This is used when working with relative paths.
+     * @param {String} [importMetaUrl] The location of the module that is calling the function. This is used when working with relative paths.
      * @param {Boolean} [cache=true] Is the SQL template cached so that it does not need to be read from the file next time.
+     * @param {Boolean} [utc=true] When using the date object as a value, will the SQL template use the local the date and time or UTC value.
      * @return {Promise} A promise that resolves the SQL template.
      */
-    static async getTemplate(file, importMetaUrl, cache) {
+    static async getTemplate(file, importMetaUrl, cache, utc) {
         // Check cache default value
         if (cache === undefined) cache = true;
 
@@ -130,25 +140,28 @@ export class SqlTemplateFile {
         // If cache being used
         if (cache === true) {
             // If the template is in the cache
-            if (SqlTools._templateCache.has(fullPath) === true) {
-                // Get the cached template
-                const template = SqlTools._templateCache.get(fullPath);
+            if (SqlTemplateFile._templateCache.has(fullPath) === true) {
+                // Get the cached SQL template
+                const sqlTemplate = SqlTemplateFile._templateCache.get(fullPath);
 
-                // Return a promise that resolves the template
-                return Promise.resolve(template);
+                // Return a promise that resolves the SQL template
+                return Promise.resolve(sqlTemplate);
             }
         }
 
         // Get template file data
         const template = await readFile(fullPath, { encoding: 'utf8' });
 
+        // Create the SQL template
+        const sqlTemplate = new SqlTemplate(template, utc);
+
         // If cache being used
         if (cache === true) {
-            // Add the template to the cache
-            SqlTools._templateCache.set(fullPath, template);
+            // Add the SQL template to the cache
+            SqlTemplateFile._templateCache.set(fullPath, sqlTemplate);
         }
 
-        // Return a promise with the resolved template
-        return Promise.resolve(template);
+        // Return a promise with the resolved SQL template
+        return Promise.resolve(sqlTemplate);
     }
 }

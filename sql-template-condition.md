@@ -32,7 +32,6 @@ The condition text is split into different types of tokens.
 |`COMPARE_GREATER`|The compare greater than `>` character.|
 |`COMPARE_LESS_EQUAL`|The compare less than or equal to `<=` character.|
 |`COMPARE_GREATER_EQUAL`|The compare greater than or equal to `>=` character.|
-|`NOT`|The not `!` character.|
 |`TRUE`|The true constant value `true`, `TRUE`.|
 |`FALSE`|The false constant value `false`, `FALSE`.|
 |`NULL`|The NULL constant value `null`, `NULL`.|
@@ -59,15 +58,9 @@ flowchart LR;
     RE[Relation Expression] --> OB["("] --> BE[Bool Expression] --> CB[")"] --> END
     RE[Relation Expression] --> TRUE --> END
     RE[Relation Expression] --> FALSE --> END
+    RE[Relation Expression] --> IDENTIFIER --> END
+    RE[Relation Expression] --> NOT --> IDENTIFIER --> END
     RE[Relation Expression] --> E1[Expression] --> COMPARE --> E2[Expression] --> END
-```
-
-```mermaid
-flowchart LR;
-    RE[Relation Expression] ~~~ NOT --> OB["("] --> BE[Bool Expression] --> CB[")"] --> END
-    RE[Relation Expression] ~~~ NOT --> TRUE --> END
-    RE[Relation Expression] --- NOT --> FALSE --> END
-    RE[Relation Expression] ~~~ NOT --> E1[Expression] --> COMPARE --> E2[Expression] --> END
 ```
 
 `EXPRESSION`

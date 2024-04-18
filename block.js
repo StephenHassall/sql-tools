@@ -2,6 +2,7 @@
  * Block
  * Used when processing the SQL templates.
  */
+import { SqlTemplateCondition } from "./sql-template-condition.js";
 
 /**
  * Block types
@@ -103,5 +104,23 @@ export class Block {
     set blockList(value) {
         // Set the block list value
         this._blockList = value;
+    }
+
+    /**
+     * Get the SQL template condition.
+     * @return {SqlTemplateCondition} The SQL template condition for the #if or #elif parts.
+     */
+    get sqlTemplateCondition() {
+        // Return the SQL template condition
+        return this._sqlTemplateCondition;
+    }
+
+    /**
+     * Sets the SQL template condition.
+     * @param {SqlTemplateCondition} value The SQL template condition for the #if or #elif parts.
+     */
+    set sqlTemplateCondition(value) {
+        // Set the SQL template condition
+        this._sqlTemplateCondition = value;
     }
 }

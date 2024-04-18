@@ -14,14 +14,18 @@
  */
 import { Block } from "./block.js";
 import { BlockType } from "./block.js";
+import { SqlTemplateCondition } from "./sql-template-condition.js";
 
 export class SqlTemplate {
     /**
      * SQL template constructor.
-     * @param {String} [template] The template to setup the SQL template with.
-     * @param {Boolean} [utc=true] Will the dates use local date and time or UTC
+     * @param {String} template The template to setup the SQL template with.
+     * @param {Boolean} [utc=true] Will the dates use local date and time or UTC.
      */
     constructor(template, utc) {
+        // If no template
+        if (typeof template !== 'string') throw new Error('Invalid template');
+
         // Set defaults
         this._blockTree = null;
 
@@ -29,33 +33,38 @@ export class SqlTemplate {
         if (utc === undefined) utc = true;
         this._utc = utc;
 
-        // If there is a template then call setup
-        if (template) this.setup(template);
-    }
-
-    /**
-     * Setup the SQL template object with the given formatted template string data.
-     * @param {String} template The text data that contains the formatted text.
-     */
-    setup(template) {
-        // If no template
-        if (typeof template !== 'string') throw new Error('Invalid template');
-
         // Set template
         this._template = template;
 
         // Create block list
         const blockList = this._createBlockList();
 
+        // Create the conditions (stop if something wrong)
+        if (this._createConditions(blockList) === false) return;
+
         // Create block tree
         this._blockTree = this._createBlockTree(blockList);
 
         // Create block tree for errors
         this._checkBlockTreeErrors(this._blockTree);
+    }
 
-        // Create SQL conditions
+    /**
+     * Format the template using the given values.
+     * @param {Object} values An object that contains all the values that will be used within the template.
+     * @return {String} The formatted template. Use this final SQL command with the database.
+     */
+    format(values) {
+        // Set values
+        this._values = values;
 
+        // Process block tree
+        let sql = this._processBlockTree(this._blockTree);
 
+        // Process values
+
+        // Return the final SQL
+        return sql;
     }
 
     /**
@@ -74,11 +83,17 @@ export class SqlTemplate {
 
         // Loop until done
         while (true) {
-            // Loop for next #if, #elif, #else and #end preprocessor command
+            // Loop for next #if, #elif, #else and #endif preprocessor command
             let ifIndex = this._template.indexOf('#if', textIndex);
             let elifIndex = this._template.indexOf('#elif', textIndex);
             let elseIndex = this._template.indexOf('#else', textIndex);
             let endIndex = this._template.indexOf('#endif', textIndex);
+
+            // Look for --if, --elif, --else and --endif
+            if (ifIndex === -1) ifIndex = this._template.indexOf('--if', textIndex);
+            if (elifIndex === -1) elifIndex = this._template.indexOf('--elif', textIndex);
+            if (elseIndex === -1) elseIndex = this._template.indexOf('--else', textIndex);
+            if (endIndex === -1) endIndex = this._template.indexOf('--endif', textIndex);
 
             // Set next index to any non-minus index
             let nextIndex = -1;
@@ -102,6 +117,7 @@ export class SqlTemplate {
                 const block = new Block();
                 block.blockType = BlockType.TEXT;
                 block.text = this._template.substring(textIndex, nextIndex);
+                block.textIndex = textIndex;
         
                 // Add to block list
                 blockList.push(block);
@@ -191,6 +207,48 @@ export class SqlTemplate {
             // Increase index for the next character
             index++;
         }
+    }
+
+    /**
+     * Create the conditions for the #if and #elif blocks.
+     * @param {Block[]} blockList The list of blocks created from the template.
+     * @return {Boolean} False if there was an error, true if okay was okay.
+     */
+    _createConditions(blockList) {
+        // For each block in list
+        for (let index = 0; index < blockList.length; index++) {
+            // Get block
+            const block = blockList[index];
+
+            // If not #if or #elif block type
+            if (block.blockType === BlockType.TEXT) continue;
+            if (block.blockType === BlockType.ELSE) continue;
+            if (block.blockType === BlockType.ENDIF) continue;
+
+            // Set condition index
+            let conditionIndex = -1;
+            if (block.text.startsWith('#if') === true) conditionIndex = 3;
+            if (block.text.startsWith('#elif') === true) conditionIndex = 5;
+            if (block.text.startsWith('--if') === true) conditionIndex = 4;
+            if (block.text.startsWith('--elif') === true) conditionIndex = 6;
+
+            // Set condition text
+            const conditionText = block.text.substring(conditionIndex).trim();
+            
+            try {
+                // Create and set SQL template condition
+                block.sqlTemplateCondition = new SqlTemplateCondition(conditionText, this._utc);
+            } catch (e) {
+                // Throw the error with a line number
+                throw new Error(e.message + ' Line ' + this._getLineNumber(block.textIndex));
+
+                // Stop processing
+                return false;
+            }
+        }
+
+        // Return everything was processed okay
+        return true;
     }
 
     /**
@@ -367,5 +425,205 @@ export class SqlTemplate {
 
         // Return the line number
         return lineNumber;
+    }
+
+    /**
+     * Process the block tree
+     * @param {Block} blockParent The parent block to process.
+     * @return {String} The SQL from the give parent.
+     */
+    _processBlockTree(blockParent) {
+        // Set SQL list
+        const sqlList = [];
+
+        // Set state
+        // 0 = outside #if...#end
+        // 1 = #if/#elif (true) read until #elif, #else, #endif
+        // 2 = #if/#elif (false) read until #elif, #else, #endif
+        // 3 = add nothing until #endif
+        let state = 0;
+
+        // For each block
+        for (let index = 0; index < blockParent.blockList.length; index++) {
+            // Get block
+            const block = blockParent.blockList[index];
+
+            // If outside #if...#endif
+            if (state === 0) {
+                // If text
+                if (block.blockType === BlockType.TEXT) {
+                    // Add this block of text to the SQL list
+                    sqlList.push(block.text);
+
+                    // Move on to next block
+                    continue;
+                }
+
+                // If parent
+                if (block.blockType === BlockType.PARENT) {
+                    // Process this block
+                    const sql = this._processBlockTree(block);
+
+                    // Add parent block SQL to the list
+                    sqlList.push(sql);
+
+                    // Move on to next block
+                    continue;
+                }
+
+                // If #if
+                if (block.blockType === BlockType.IF) {
+                    // Test the if condition
+                    if (block.sqlTemplateCondition.getResult(this._values) === true) {
+                        // Set state to read true section
+                        state = 1;
+                    } else {
+                        // Set state to look for next #elif or #else
+                        state = 2;
+                    }
+
+                    // Move on to next block
+                    continue;
+                }
+            }
+
+            // If inside condition true
+            if (state === 1) {
+                // If text
+                if (block.blockType === BlockType.TEXT) {
+                    // Add this block of text to the SQL list
+                    sqlList.push(block.text);
+
+                    // Move on to next block
+                    continue;
+                }
+
+                // If parent
+                if (block.blockType === BlockType.PARENT) {
+                    // Process this block
+                    const sql = this._processBlockTree(block);
+
+                    // Add parent block SQL to the list
+                    sqlList.push(sql);
+
+                    // Move on to next block
+                    continue;
+                }
+
+                // If #endif
+                if (block.blockType === BlockType.ENDIF) {
+                    // Set state to outside #if...#endif
+                    state = 0;
+
+                    // Move on to next block
+                    continue;
+                }
+
+                // If #elif, #else
+                if (block.blockType === BlockType.ELIF || block.blockType === BlockType.ELSE) {
+                    // Set state to add nothing until after #endif
+                    state = 3;
+
+                    // Move on to next block
+                    continue;
+                }
+            }
+
+            // If inside condition false
+            if (state === 2) {
+                // If #elif
+                if (block.blockType === BlockType.ELIF) {
+                    // Test the elif condition
+                    if (block.sqlTemplateCondition.getResult(this._values) === true) {
+                        // Set state to use the elif section
+                        state = 1;
+                    }
+
+                    // Move on to next block
+                    continue;
+                }
+
+                // If #else
+                if (block.blockType === BlockType.ELSE) {
+                    // Set state to use the elif section
+                    state = 1;
+
+                    // Move on to next block
+                    continue;
+                }
+
+                // If text or parent then do nothing
+                if (block.blockType === BlockType.TEXT ||
+                    block.blockType === BlockType.PARENT) {
+                    // Move on to next block
+                    continue;
+                }
+
+                // If #endif
+                if (block.blockType === BlockType.ENDIF) {
+                    // Set state to be outside #if...#endif
+                    state = 0;
+
+                    // Move on to next block
+                    continue;
+                }
+            }
+
+            // If inside but adding nothing more until #endif
+            if (state === 3) {
+                // If #endif
+                if (block.blockType === BlockType.ENDIF) {
+                    // Set state to be outside #if...#endif
+                    state = 0;
+                }
+
+                // Move on to next block
+                continue;
+            }
+        }
+
+        // Join all the SQL text into one SQL command
+        const sql = sqlList.join('');
+
+        // Return the SQL text
+        return sql;
+    }
+
+    /**
+     * Process the SQL values. This converts the $property values into the final SQL command.
+     * @param {String} sql The SQL template text that needs to be processed.
+     * @return {String} The final SQL command.
+     */
+    _processSqlValues(sql) {
+        // Get the value properties
+        const propertyList = Object.keys(this._values);
+
+        // For each property
+        propertyList.forEach((property) => {
+            // Create $property id text
+            const propertyId = '$' + property;
+
+            // If not used then skip this property
+            if (sql.indexOf(propertyId) === -1) return;
+
+            // Get the property value
+            const value = this._values[property];
+
+            // We need to convert the value into text
+            let valueText = '';
+
+            // If number
+            if (typeof value === 'number') valueText = value.toString();
+
+            // If boolean
+            else if (typeof value === 'boolean') {
+                if (value === true) valueText = 'TRUE';
+                if (value === false) valueText = 'FALSE';
+            }
+
+            // If date
+            //else if (typeof value === 'object' || )
+        });
+
     }
 }
