@@ -4,6 +4,7 @@
  */
 import { Node } from "./node.js";
 import { NodeType } from "./node.js";
+import { SqlConfig } from "./sql-config.js";
 import { SqlConvert } from "./sql-convert.js";
 import { Token } from "./token.js";
 import { TokenType } from "./token.js";
@@ -12,17 +13,17 @@ export class SqlTemplateCondition {
     /**
      * Default constructor.
      * @param {String} condition The condition text. 
-     * @param {Boolean} utc Will the dates use local date and time or UTC
+     * @param {SqlConfig} sqlConfig The SQL config settings to use.
      */
-    constructor(condition, utc) {
+    constructor(condition, sqlOptions) {
         // If no condition text
         if (!condition) throw new Error('Missing condition data');
 
         // Set condition
         this._condition = condition;
 
-        // Set utc
-        this._utc = utc;
+        // Set SQL config
+        this._sqlConfig = sqlConfig;
 
         // Build condition
         this._build();
@@ -1185,7 +1186,7 @@ export class SqlTemplateCondition {
                     if (value === null) return null;
 
                     // If Date class
-                    if (value instanceof Date) return SqlConvert.dateToSql(value, this._utc);
+                    if (value instanceof Date) return SqlConvert.dateToSql(value, this._sqlConfig);
 
                     // Return the value as is
                     return value;

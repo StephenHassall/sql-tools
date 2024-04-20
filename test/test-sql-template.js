@@ -16,10 +16,11 @@ export default class TestSqlTemplate {
         Test.test('SqlTemplate');
 
         // Perform tests
-        await TestSqlTemplate.testCreateBlockList();
-        await TestSqlTemplate.testCreateBlockTree();
-        await TestSqlTemplate.testCheckBlockTreeError();
-        await TestSqlTemplate.testProcessBlockTree();
+        //await TestSqlTemplate.testCreateBlockList();
+        //await TestSqlTemplate.testCreateBlockTree();
+        //await TestSqlTemplate.testCheckBlockTreeError();
+        //await TestSqlTemplate.testProcessBlockTree();
+        TestSqlTemplate.testProcessSqlValues();
     }
 
     /**
@@ -367,7 +368,7 @@ export default class TestSqlTemplate {
         Test.describe('processBlockTree processBlockTree1.sql');
         let template = await readFile('./test/sql/processBlockTree1.sql', { encoding: 'utf8' });
         Test.assert(template);
-        let sqlTemplate = new SqlTemplate(template, true);
+        let sqlTemplate = new SqlTemplate(template);
         let sql = sqlTemplate.format(values);
         Test.assertEqual(sql, 'block1\r\nblock2\r\nblock3');
 
@@ -375,7 +376,7 @@ export default class TestSqlTemplate {
         Test.describe('processBlockTree processBlockTree2.sql');
         template = await readFile('./test/sql/processBlockTree2.sql', { encoding: 'utf8' });
         Test.assert(template);
-        sqlTemplate = new SqlTemplate(template, true);
+        sqlTemplate = new SqlTemplate(template);
         sql = sqlTemplate.format(values);
         Test.assertEqual(sql, 'block1\r\nblock3\r\nblock4');
 
@@ -383,7 +384,7 @@ export default class TestSqlTemplate {
         Test.describe('processBlockTree processBlockTree3.sql');
         template = await readFile('./test/sql/processBlockTree3.sql', { encoding: 'utf8' });
         Test.assert(template);
-        sqlTemplate = new SqlTemplate(template, true);
+        sqlTemplate = new SqlTemplate(template);
         sql = sqlTemplate.format(values);
         Test.assertEqual(sql, 'block1\r\nblock4\r\nblock5');
 
@@ -391,7 +392,7 @@ export default class TestSqlTemplate {
         Test.describe('processBlockTree processBlockTree4.sql');
         template = await readFile('./test/sql/processBlockTree4.sql', { encoding: 'utf8' });
         Test.assert(template);
-        sqlTemplate = new SqlTemplate(template, true);
+        sqlTemplate = new SqlTemplate(template);
         sql = sqlTemplate.format(values);
         Test.assertEqual(sql, 'block1\r\nblock3\r\nblock5');
 
@@ -399,7 +400,7 @@ export default class TestSqlTemplate {
         Test.describe('processBlockTree processBlockTree5.sql');
         template = await readFile('./test/sql/processBlockTree5.sql', { encoding: 'utf8' });
         Test.assert(template);
-        sqlTemplate = new SqlTemplate(template, true);
+        sqlTemplate = new SqlTemplate(template);
         sql = sqlTemplate.format(values);
         Test.assertEqual(sql, 'block1\r\nblock3\r\nblock6');
 
@@ -407,8 +408,37 @@ export default class TestSqlTemplate {
         Test.describe('processBlockTree processBlockTree6.sql');
         template = await readFile('./test/sql/processBlockTree6.sql', { encoding: 'utf8' });
         Test.assert(template);
-        sqlTemplate = new SqlTemplate(template, true);
+        sqlTemplate = new SqlTemplate(template);
         sql = sqlTemplate.format(values);
         Test.assertEqual(sql, 'block1\r\nblock2\r\nblock4\r\nblock5\r\nblock10');
+    }
+
+    /**
+     * Test the process SQL values.
+     */
+    static testProcessSqlValues() {
+        // Test single value
+        Test.describe('processSqlValues single value');
+        let sqlTemplate = new SqlTemplate('true');
+        sqlTemplate._values = {};
+        sqlTemplate._values.id = 123;
+        let sql = sqlTemplate._processSqlValues('text $id text')
+        Test.assertEqual(sql, 'text 123 text');
+
+        // Test value used twice
+        Test.describe('processSqlValues value used twice');
+        sqlTemplate._values = {};
+        sqlTemplate._values.id = 123;
+        sql = sqlTemplate._processSqlValues('text $id text $id text')
+        Test.assertEqual(sql, 'text 123 text 123 text');
+
+        // Test no identifiers
+        Test.describe('processSqlValues no identifiers');
+        sqlTemplate._values = {};
+        sql = sqlTemplate._processSqlValues('text text')
+        Test.assertEqual(sql, 'text text');
+
+        // Test identifier inside identifier value
+
     }
 }

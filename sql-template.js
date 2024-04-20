@@ -14,24 +14,38 @@
  */
 import { Block } from "./block.js";
 import { BlockType } from "./block.js";
+import { SqlConfig } from "./sql-config.js";
+import { SqlConvert } from "./sql-convert.js";
 import { SqlTemplateCondition } from "./sql-template-condition.js";
 
 export class SqlTemplate {
     /**
+     * Identifier regex. This is used to look for $value parts.
+     */
+    static _regex = RegExp(
+        // Identifier group
+        // \$ = starts with the "$" character
+        // \w = must start with a character (including _)
+        // [\w\d]+ = contain zero or more word or digit characters
+        '(?<identifier>\\\$\\w[\\w\\d]*)',
+
+        // Global
+        'g');
+
+    /**
      * SQL template constructor.
      * @param {String} template The template to setup the SQL template with.
-     * @param {Boolean} [utc=true] Will the dates use local date and time or UTC.
+     * @param {SqlConfig} [sqlConfig] The SQL config settings to use.
      */
-    constructor(template, utc) {
+    constructor(template, sqlConfig) {
         // If no template
         if (typeof template !== 'string') throw new Error('Invalid template');
 
         // Set defaults
         this._blockTree = null;
 
-        // Check and set default utc
-        if (utc === undefined) utc = true;
-        this._utc = utc;
+        // Set SQL config
+        this._sqlConfig = sqlConfig;
 
         // Set template
         this._template = template;
@@ -237,7 +251,7 @@ export class SqlTemplate {
             
             try {
                 // Create and set SQL template condition
-                block.sqlTemplateCondition = new SqlTemplateCondition(conditionText, this._utc);
+                block.sqlTemplateCondition = new SqlTemplateCondition(conditionText, this._sqlConfig);
             } catch (e) {
                 // Throw the error with a line number
                 throw new Error(e.message + ' Line ' + this._getLineNumber(block.textIndex));
@@ -592,38 +606,43 @@ export class SqlTemplate {
     /**
      * Process the SQL values. This converts the $property values into the final SQL command.
      * @param {String} sql The SQL template text that needs to be processed.
-     * @return {String} The final SQL command.
+     * @return {String} The processed SQL command.
      */
     _processSqlValues(sql) {
-        // Get the value properties
-        const propertyList = Object.keys(this._values);
+        // Set converted values
+        const convertedValues = {};
 
-        // For each property
-        propertyList.forEach((property) => {
-            // Create $property id text
-            const propertyId = '$' + property;
+        // Replace the sql identifiers with their values
+        const processedSql = sql.replace(
+            SqlTemplate._regex,
+            (fullMatch, identifier) => {
+                // If not identifier then return full match
+                if (!identifier) return fullMatch;
 
-            // If not used then skip this property
-            if (sql.indexOf(propertyId) === -1) return;
+                // Create $identifier property name (remove the starting $ character)
+                const identifierPropertyName = identifier.substring(1);
 
-            // Get the property value
-            const value = this._values[property];
+                // If we have used this identifier already then just return it
+                if (identifierPropertyName in convertedValues) return convertedValues[identifierPropertyName];
 
-            // We need to convert the value into text
-            let valueText = '';
+                // If there is not value with the matching property name then does nothing with the identifier
+                if (!(identifierPropertyName in this._values)) return identifier;
 
-            // If number
-            if (typeof value === 'number') valueText = value.toString();
+                // Get value
+                const value = this._values[identifierPropertyName];
 
-            // If boolean
-            else if (typeof value === 'boolean') {
-                if (value === true) valueText = 'TRUE';
-                if (value === false) valueText = 'FALSE';
+                // Convert value into SQL
+                const sqlValue = SqlConvert.valueToSql(value, this._sqlConfig);
+
+                // Save the converted value to be used again next time
+                convertedValues[identifierPropertyName] = sqlValue;
+
+                // Return the SQL value
+                return sqlValue;
             }
+        );
 
-            // If date
-            //else if (typeof value === 'object' || )
-        });
-
+        // Return the processed SQL
+        return processedSql;
     }
 }

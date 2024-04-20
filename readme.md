@@ -1,7 +1,12 @@
 # SQL Tools
 
 ```javascript
-const sqlTemplate = SqlTemplateFile.getTemplate('./search.sql');
+
+//const sqlOptions = new SqlOptions();
+SqlOptions.default.databaseType = DatabaseType.MYSQL;
+
+//const sqlTemplate = await SqlTemplateFile.getTemplate('./search.sql', sqlOptions);
+const sqlTemplate = await SqlTemplateFile.getTemplate('./search.sql');
 
 const values = {};
 values.filterByAge = 18;
@@ -34,6 +39,7 @@ WHERE
 
 -- Set order
 ORDER BY
+
 --if $orderBy="name"
   field_name
 --elif $orderBy="date"
@@ -54,9 +60,26 @@ LIMIT
 
 ```sql
 -- Not like this
-name LIKE "%$filderByName%"
+name LIKE '%$filderByName%'
 
 -- Do this instead
-name LIKE CONCAT("%", $filderByName, "%");
+name LIKE CONCAT('%', $filderByName, '%');
 ```
 
+```javascript
+const values = {};
+values.bulkInsertList = [
+  [ 12, 'hello' ],
+  [ 23, 'world' ]
+];
+```
+
+```sql
+INSERT INTO table (field1, field2)
+VALUES
+  $bulkInsertList;
+
+-- INSERT INTO table (field1, field2)
+-- (12, 'hello'),
+-- (23, 'world');
+```

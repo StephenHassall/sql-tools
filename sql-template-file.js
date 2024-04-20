@@ -18,11 +18,11 @@ export class SqlTemplateFile {
      * @param {String} name The name of the template. This is used to search for the template within the file.
      * @param {String} file Either the full path to the file or (if importMetaUrl is used) the relative path to the file.
      * @param {String} [importMetaUrl] The location of the module that is calling the function. This is used when working with relative paths.
-     * @param {Boolean} [cache=true] Is the template cached so that it does not need to be read from the file next time.
-     * @param {Boolean} [utc=true] When using the date object as a value, will the SQL template use the local the date and time or UTC value.
+     * @param {SqlConfig} [sqlConfig] The SQL config settings to use.
+     * @param {Boolean} [cache=true] Is the SQL template cached so that it does not need to be read from the file next time.
      * @return {Promise} A promise that resolves the SQL template.
      */
-    static async getTemplateByName(name, file, importMetaUrl, cache, utc) {
+    static async getTemplateByName(name, file, importMetaUrl, sqlConfig, cache) {
         // Check cache default value
         if (cache === undefined) cache = true;
 
@@ -98,7 +98,7 @@ export class SqlTemplateFile {
         const template = fileData.substring(startIndex, endIndex);
 
         // Create the SQL template
-        const sqlTemplate = new SqlTemplate(template, utc);
+        const sqlTemplate = new SqlTemplate(template, sqlConfig);
 
         // If cache being used
         if (cache === true) {
@@ -114,11 +114,11 @@ export class SqlTemplateFile {
      * Get a SQL template from a file (or cache).
      * @param {String} file Either the full path to the file or (if importMetaUrl is used) the relative path to the file.
      * @param {String} [importMetaUrl] The location of the module that is calling the function. This is used when working with relative paths.
+     * @param {SqlConfig} [sqlConfig] The SQL config settings to use.
      * @param {Boolean} [cache=true] Is the SQL template cached so that it does not need to be read from the file next time.
-     * @param {Boolean} [utc=true] When using the date object as a value, will the SQL template use the local the date and time or UTC value.
      * @return {Promise} A promise that resolves the SQL template.
      */
-    static async getTemplate(file, importMetaUrl, cache, utc) {
+    static async getTemplate(file, importMetaUrl, sqlConfig, cache) {
         // Check cache default value
         if (cache === undefined) cache = true;
 
@@ -153,7 +153,7 @@ export class SqlTemplateFile {
         const template = await readFile(fullPath, { encoding: 'utf8' });
 
         // Create the SQL template
-        const sqlTemplate = new SqlTemplate(template, utc);
+        const sqlTemplate = new SqlTemplate(template, sqlConfig);
 
         // If cache being used
         if (cache === true) {
