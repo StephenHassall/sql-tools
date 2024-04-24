@@ -4,7 +4,6 @@
 import { BlockType } from "../block.js";
 import { readFile } from "node:fs/promises";
 import { SqlTemplate } from "../sql-template.js";
-import { SqlTemplateFile } from "../sql-template-file.js";
 import Test from "./test.js";
 
 export default class TestSqlTemplate {

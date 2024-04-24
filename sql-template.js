@@ -76,6 +76,7 @@ export class SqlTemplate {
         let sql = this._processBlockTree(this._blockTree);
 
         // Process values
+        sql = this._processSqlValues(sql);
 
         // Return the final SQL
         return sql;

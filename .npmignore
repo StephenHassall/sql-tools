@@ -1,0 +1,8 @@
+# Do not include environment files
+.env
+
+# Skip .vscode folder
+.vscode/
+
+# Skip testing folder
+test/
