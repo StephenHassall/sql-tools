@@ -72,6 +72,16 @@ export class SqlConvert {
         'g');
 
     /**
+     * Microsoft SQL server string regex. This is used to convert strings into SQL strings.
+     */
+    static _msSqlServerStringRegex = RegExp(
+        // Single quotation
+        '(?<singleQuotation>\')',
+
+        // Global
+        'g');
+
+    /**
      * MySQL identifier regex. This is used to convert identifiers into SQL strings.
      */
     static _mySqlIdentifierRegex = RegExp(
@@ -109,7 +119,10 @@ export class SqlConvert {
      */
     static _postgreSqlJsonRegex = RegExp(
         // Single quotation
-        '(?<singleQuotation>\')',
+        '(?<singleQuotation>\')|' +
+        
+       // Back slash
+       '(?<backSlash>\\\\)',
         
         // Global
         'g');
@@ -125,16 +138,13 @@ export class SqlConvert {
         if (value === undefined) return 'NULL';
 
         // If null
-        if (value === null) return 'NULL';
+        else if (value === null) return 'NULL';
 
         // If number
-        if (typeof value === 'number') return value.toString();
+        else if (typeof value === 'number') return value.toString();
 
         // If boolean
-        else if (typeof value === 'boolean') {
-            if (value === true) return 'TRUE';
-            if (value === false) return 'FALSE';
-        }
+        else if (typeof value === 'boolean') return SqlConvert.booleanToSql(value, sqlConfig);
 
         // If string
         else if (typeof value === 'string') return SqlConvert.stringToSql(value, sqlConfig);
@@ -159,7 +169,34 @@ export class SqlConvert {
     }
 
     /**
-     * Convert the date and time into an SQL text format. Format is YYYY-MM-DD HH:MM:SS.
+     * Convert the boolean into an SQL text format.
+     * @param {Boolean} value The boolean value to convert.
+     * @param {SqlConfig} [sqlConfig] The SQL config settings to use.
+     * @return {String} The boolean in SQL text format.
+     */
+    static booleanToSql(value, sqlConfig) {
+        // Make sure the value is a boolean
+        if (typeof value !== 'boolean') throw new Error('Invalid value');
+
+        // If SQL config is not set then use the default one
+        if (!sqlConfig) sqlConfig = SqlConfig.default;
+
+        // If database is Microsoft SQL Server
+        if (sqlConfig.databaseType === DatabaseType.MS_SQL_SERVER) {
+            // Check value and return resut
+            if (value === true) return '1';
+            if (value === false) return '0';
+        }
+
+        // If true then return TRUE
+        if (value === true) return 'TRUE';
+
+        // Otherwise return FALSE
+        return 'FALSE';
+    }
+
+    /**
+     * Convert the date and time into an SQL text format.
      * @param {Date} date The date object to convert.
      * @param {SqlConfig} [sqlConfig] The SQL config settings to use.
      * @return {String} The date in SQL text format.
@@ -174,56 +211,11 @@ export class SqlConvert {
         // If the date is invalid then return NULL
         if (isNaN(date.getTime()) === true) return 'NULL';
 
-        // Get date and time values
-        let year = 0;
-        let month = 0;
-        let day = 0;
-        let hour = 0;
-        let minute = 0;
-        let second = 0;
-        let millisecond = 0;
+        // Convert the date into SQL text
+        const sqlDateText = SqlConvert._convertDateToSql(date, sqlConfig);
 
-        // If UTC
-        if (sqlConfig.utc === true) {
-            // Get UTC date and time values
-            year = date.getUTCFullYear();
-            month = date.getUTCMonth() + 1;
-            day = date.getUTCDate();
-            hour = date.getUTCHours();
-            minute = date.getUTCMinutes();
-            second = date.getUTCSeconds();
-            millisecond = date.getUTCMilliseconds();
-        } else {
-            // Get local date and time values
-            year = date.getFullYear();
-            month = date.getMonth() + 1;
-            day = date.getDate();
-            hour = date.getHours();
-            minute = date.getMinutes();
-            second = date.getSeconds();
-            millisecond = date.getMilliseconds();
-        }
-
-        // Format parts
-        const yearText = year.toString();
-        const monthText = month.toString().padStart(2, '0');
-        const dayText = day.toString().padStart(2, '0');
-        const hourText = hour.toString().padStart(2, '0');
-        const minuteText = minute.toString().padStart(2, '0');
-        const secondText = second.toString().padStart(2, '0');
-
-        // Check milliseconds
-        let millisecondText = '';
-        if (millisecond !== 0) {
-            // Set millisecond text
-            millisecondText = '.' + millisecond.toString().padStart(3, '0');
-        }
-
-        // Format SQL date time
-        const sqlText =
-            '\'' + yearText + '-' + monthText + '-' + dayText +
-            ' ' + hourText + ':' + minuteText + ':' + secondText +
-            millisecondText + '\'';
+        // Add single quotation marks
+        const sqlText ='\'' + sqlDateText + '\'';
         
         // Return formatted SQL date time
         return sqlText;
@@ -243,70 +235,25 @@ export class SqlConvert {
         // If SQL config is not set then use the default one
         if (!sqlConfig) sqlConfig = SqlConfig.default;
 
+        // Convert value into SQL text
+        const sql = SqlConvert._convertStringToSql(value, sqlConfig);
+
         // If database is MySQL
         if (sqlConfig.databaseType === DatabaseType.MYSQL) {
-            // Replace any problem characters in the string value to be used in SQL
-            const sql = value.replace(
-                SqlConvert._mySqlStringRegex,
-                (
-                    fullMatch,
-                    nullEnd,
-                    backspace,
-                    tab,
-                    newline,
-                    carriageReturn,
-                    substitute,
-                    doubleQuotation,
-                    singleQuotation,
-                    backSlash) => {
-                    // Check match and return SQL response
-                    if (nullEnd) return '\\0';
-                    if (backspace) return '\\b';
-                    if (tab) return '\\t';
-                    if (newline) return '\\n';
-                    if (carriageReturn) return '\\r';
-                    if (substitute) return '\\Z';
-                    if (doubleQuotation) return '\\"';
-                    if (singleQuotation) return '\\\'';
-                    if (backSlash) return '\\\\';
-                    return fullMatch;
-                }
-            );
-
             // Return the SQL text within single quotation marks
             return '\'' + sql + '\'';
         }
 
         // If database is PostgreSQL
         if (sqlConfig.databaseType === DatabaseType.POSTGRESQL) {
-            // Replace any problem characters in the string value to be used in SQL
-            const sql = value.replace(
-                SqlConvert._postgreSqlStringRegex,
-                (
-                    fullMatch,
-                    backspace,
-                    formFeed,
-                    newline,
-                    carriageReturn,
-                    tab,
-                    doubleQuotation,
-                    singleQuotation,
-                    backSlash) => {
-                    // Check match and return SQL response
-                    if (backspace) return '\\b';
-                    if (formFeed) return '\\f';
-                    if (newline) return '\\n';
-                    if (carriageReturn) return '\\r';
-                    if (tab) return '\\t';
-                    if (doubleQuotation) return '\\"';
-                    if (singleQuotation) return '\\\'';
-                    if (backSlash) return '\\\\';
-                    return fullMatch;
-                }
-            );
-
             // Return the SQL text within an E and single quotation marks
             return 'E\'' + sql + '\'';
+        }
+
+        // If database is Microsoft SQL Server
+        if (sqlConfig.databaseType === DatabaseType.MS_SQL_SERVER) {
+            // Return the SQL text within an N and single quotation marks
+            return 'N\'' + sql + '\'';
         }
     }
 
@@ -358,6 +305,15 @@ export class SqlConvert {
             // Return the SQL identifier within double quotation marks
             return '\"' + sql + '\"';
         }
+
+        // If database is Microsoft SQL Server
+        if (sqlConfig.databaseType === DatabaseType.MS_SQL_SERVER) {
+            // Check for the "]" character
+            if (value.indexOf(']') !== -1) throw new Error('Invalid value. Contains "]" character');
+
+            // Return the value as it is with [...] square brackets
+            return '[' + value + ']';
+        }
     }
 
     /**
@@ -384,6 +340,12 @@ export class SqlConvert {
             // Return the hexadecimal SQL text
             return '\'\\x' + buffer.toString('hex') + '\'';
         }
+
+        // If database is Microsoft SQL Server
+        if (sqlConfig.databaseType === DatabaseType.MS_SQL_SERVER) {
+            // Return the hexadecimal SQL text
+            return '0x' + buffer.toString('hex');
+        }
     }
 
     /**
@@ -396,38 +358,29 @@ export class SqlConvert {
         // Make sure the value is an array
         if (typeof array !== 'object' || !(array instanceof Array)) throw new Error('Invalid array');
 
-        // Set sql list
-        const sqlList = [];
+        // If SQL config is not set then use the default one
+        if (!sqlConfig) sqlConfig = SqlConfig.default;
 
-        // For each array value
-        for (let index = 0; index < array.length; index++) {
-            // Get value
-            const value = array[index];
+        // Convert the array into SQL text
+        const sql = SqlConvert._convertArrayToSql(array, sqlConfig);
 
-            // If not the first value in the list then add , character
-            if (index !== 0) sqlList.push(', ');
+        // If database is MySQL
+        if (sqlConfig.databaseType === DatabaseType.MYSQL) {
+            // Return the SQL text within single quotation marks
+            return '\'' + sql + '\'';
+        }
 
-            // If value is a sub-array
-            if (Array.isArray(value) === true) {
-                // Add opening bracket
-                sqlList.push('(');
+        // If database is PostgreSQL
+        if (sqlConfig.databaseType === DatabaseType.POSTGRESQL) {
+            // Return the SQL text within an E, single quotation marks and {...} characters
+            return 'E\'{' + sql + '}\'';
+        }
 
-                // Add sub-array to SQL
-                sqlList.push(SqlConvert.arrayToSql(value));
-
-                // Add closing bracket
-                sqlList.push(')');
-
-                // Move on to next value
-                continue;
-            }
-
-            // Add value
-            sqlList.push(SqlConvert.valueToSql(value, sqlConfig));
-        };
-
-        // Put together the array SQL
-        const sql = sqlList.join('');
+        // If database is Microsoft SQL Server
+        if (sqlConfig.databaseType === DatabaseType.MS_SQL_SERVER) {
+            // Return the SQL text within an N and single quotation marks
+            return 'N\'' + sql + '\'';
+        }
 
         // Return the sql text
         return sql;
@@ -470,9 +423,11 @@ export class SqlConvert {
                 SqlConvert._postgreSqlJsonRegex,
                 (
                     fullMatch,
-                    singleQuotation) => {
+                    singleQuotation,
+                    backSlash) => {
                     // Check match and return SQL response
                     if (singleQuotation) return '\\\'';
+                    if (backSlash) return '\\\\';
                     return fullMatch;
                 }
             );
@@ -480,6 +435,240 @@ export class SqlConvert {
             // Return the SQL text within an E and single quotation marks
             return 'E\'' + sql + '\'';
         }
+    }
+
+    /**
+     * Convert the string of text into a SQL string. This checks for escape characters.
+     * @param {String} value The string that needs checking and converting.
+     * @param {SqlConfig} sqlConfig The SQL config settings to use.
+     * @return {String} The string that is safe to use as SQL text.
+     */
+    static _convertStringToSql(value, sqlConfig) {
+        // If database is MySQL
+        if (sqlConfig.databaseType === DatabaseType.MYSQL) {
+            // Replace any problem characters in the string value to be used in SQL
+            const sql = value.replace(
+                SqlConvert._mySqlStringRegex,
+                (
+                    fullMatch,
+                    nullEnd,
+                    backspace,
+                    tab,
+                    newline,
+                    carriageReturn,
+                    substitute,
+                    doubleQuotation,
+                    singleQuotation,
+                    backSlash) => {
+                    // Check match and return SQL response
+                    if (nullEnd) return '\\0';
+                    if (backspace) return '\\b';
+                    if (tab) return '\\t';
+                    if (newline) return '\\n';
+                    if (carriageReturn) return '\\r';
+                    if (substitute) return '\\Z';
+                    if (doubleQuotation) return '\\"';
+                    if (singleQuotation) return '\\\'';
+                    if (backSlash) return '\\\\';
+                    return fullMatch;
+                }
+            );
+
+            // Return the SQL text
+            return sql;
+        }
+
+        // If database is PostgreSQL
+        if (sqlConfig.databaseType === DatabaseType.POSTGRESQL) {
+            // Replace any problem characters in the string value to be used in SQL
+            const sql = value.replace(
+                SqlConvert._postgreSqlStringRegex,
+                (
+                    fullMatch,
+                    backspace,
+                    formFeed,
+                    newline,
+                    carriageReturn,
+                    tab,
+                    doubleQuotation,
+                    singleQuotation,
+                    backSlash) => {
+                    // Check match and return SQL response
+                    if (backspace) return '\\b';
+                    if (formFeed) return '\\f';
+                    if (newline) return '\\n';
+                    if (carriageReturn) return '\\r';
+                    if (tab) return '\\t';
+                    if (doubleQuotation) return '\\"';
+                    if (singleQuotation) return '\\\'';
+                    if (backSlash) return '\\\\';
+                    return fullMatch;
+                }
+            );
+
+            // Return the SQL text
+            return sql;
+        }
+
+        // If database is Microsoft SQL Server
+        if (sqlConfig.databaseType === DatabaseType.MS_SQL_SERVER) {
+            // Replace any problem characters in the string value to be used in SQL
+            const sql = value.replace(
+                SqlConvert._msSqlServerStringRegex,
+                (
+                    fullMatch,
+                    singleQuotation) => {
+                    // Check match and return SQL response
+                    if (singleQuotation) return '\'\'';
+                    return fullMatch;
+                }
+            );
+
+            // Return the SQL text
+            return sql;
+        }
+    }
+
+    /**
+     * Convert the date and time into an SQL text format.
+     * @param {Date} date The date object to convert.
+     * @param {SqlConfig} sqlConfig The SQL config settings to use.
+     * @return {String} The date in SQL text format.
+     */
+    static _convertDateToSql(date, sqlConfig) {
+        // Get date and time values
+        let year = 0;
+        let month = 0;
+        let day = 0;
+        let hour = 0;
+        let minute = 0;
+        let second = 0;
+        let millisecond = 0;
+
+        // If UTC
+        if (sqlConfig.utc === true) {
+            // Get UTC date and time values
+            year = date.getUTCFullYear();
+            month = date.getUTCMonth() + 1;
+            day = date.getUTCDate();
+            hour = date.getUTCHours();
+            minute = date.getUTCMinutes();
+            second = date.getUTCSeconds();
+            millisecond = date.getUTCMilliseconds();
+        } else {
+            // Get local date and time values
+            year = date.getFullYear();
+            month = date.getMonth() + 1;
+            day = date.getDate();
+            hour = date.getHours();
+            minute = date.getMinutes();
+            second = date.getSeconds();
+            millisecond = date.getMilliseconds();
+        }
+
+        // Format parts
+        const yearText = year.toString();
+        const monthText = month.toString().padStart(2, '0');
+        const dayText = day.toString().padStart(2, '0');
+        const hourText = hour.toString().padStart(2, '0');
+        const minuteText = minute.toString().padStart(2, '0');
+        const secondText = second.toString().padStart(2, '0');
+
+        // Check milliseconds
+        let millisecondText = '';
+        if (millisecond !== 0) {
+            // Set millisecond text
+            millisecondText = '.' + millisecond.toString().padStart(3, '0');
+        }
+
+        // Format SQL date time
+        const sqlText =
+            yearText + '-' + monthText + '-' + dayText + ' ' +
+            hourText + ':' + minuteText + ':' + secondText +
+            millisecondText;
+        
+        // Return formatted SQL date time
+        return sqlText;
+    }
+
+    /**
+     * Convert the array into multiple {...} SQL parts.
+     * @param {Array} array The array of things to convert to SQL.
+     * @param {SqlConfig} sqlConfig The SQL config settings to use.
+     * @return {String} The array of things in a text SQL format.
+     */
+    static _convertArrayToSql(array, sqlConfig) {
+        // Set sql list
+        const sqlList = [];
+
+        // For each array value
+        for (let index = 0; index < array.length; index++) {
+            // Get value
+            const value = array[index];
+
+            // If not the first value in the list then add , character
+            if (index !== 0) sqlList.push(', ');
+
+            // If undefined
+            if (value === undefined) sqlList.push('NULL');
+
+            // If null
+            else if (value === null) sqlList.push('NULL');
+
+            // If number
+            else if (typeof value === 'number') sqlList.push(value.toString());
+
+            // If boolean
+            else if (typeof value === 'boolean') {
+                if (value === true) sqlList.push('TRUE');
+                if (value === false) sqlList.push('FALSE');
+            }
+
+            // If value is a sub-array
+            else if (Array.isArray(value) === true) {
+                // Add opening bracket
+                sqlList.push('{');
+
+                // Add sub-array to SQL
+                sqlList.push(SqlConvert._convertArrayToSql(value, sqlConfig));
+
+                // Add closing bracket
+                sqlList.push('}');
+
+                // Move on to next value
+                continue;
+            }
+
+            // If string
+            else if (typeof value === 'string') {
+                // Convert value into SQL text
+                const sqlStringText = SqlConvert._convertStringToSql(value, sqlConfig);
+
+                // Add date to list
+                sqlList.push('\"' + sqlStringText + '\"');
+            }
+            
+            // If object
+            else if (typeof value === 'object') {
+                // If date
+                if (value instanceof Date) {
+                    // If the date is invalid then add NULL to list
+                    if (isNaN(value.getTime()) === true) { sqlList.push('NULL'); continue; }
+
+                    // Conver the date into SQL text
+                    const sqlDateText = SqlConvert._convertDateToSql(date, sqlConfig);
+
+                    // Add date to list
+                    sqlList.push('\"' + sqlDateText + '\"');
+                }                
+            }
+        };
+
+        // Put together the array SQL
+        const sql = sqlList.join('');
+
+        // Return the SQL
+        return sql;
     }
 }
 
@@ -559,98 +748,47 @@ export class SqlJson {
             this._value === null ||
             typeof this._value !== 'object') throw new Error('Invalid value');
 
-        //return '\'' + SqlConvert.stringToSql(JSON.stringify(this._value)) + '\'';
-
-        // Convert the object into JSON
-        //const json = this._convertObjectToSql(this._value);
-
-        // Return the JSON in a string
-        //return '\'' + json + '\'';
-
+        // Convert and return the value as JSON text
         return SqlConvert.jsonToSql(this._value, sqlConfig);
+    }
+}
+
+/**
+ * SQL Non-Unicode.
+ * Used to add sting data that is non-unicode into a SQL safe string value.
+ * Microsoft SQL server has all unicode text start with N'...'. By default
+ * all strings are outputted using this format. Using this class stops the
+ * N prefix being added.
+ */
+export class SqlNonUnicode {
+    /**
+     * SQL non-unicode constructor.
+     * @param {String} text The text that will be added to the SQL.
+     */
+    constructor(text) {
+        // Set text value
+        this._text = text;
     }
 
     /**
-     * Convert the given object into a SQL safe text.
-     * @param {Object|Array} object The object or array to convert.
+     * Convert the text value into safe SQL string.
      * @param {SqlConfig} [sqlConfig] The SQL config settings to use.
-     * @return {String} The converted SQL text.
+     * @return {String} The text as safe SQL text.
      */
-    _convertObjectToSql(object, sqlConfig) {
-        // Set SQL list
-        const sqlList = [];
+    toSql(sqlConfig) {
+        // If SQL config is not set then use the default one
+        if (!sqlConfig) sqlConfig = SqlConfig.default;
 
-        // If array
-        if (object instanceof Array) {
-            // Add starting [ character
-            sqlList.push('[');
-        } else {
-            // Add starting { character
-            sqlList.push('{');
+        // Get the sql value
+        const sql = SqlConvert.stringToSql(this._text, sqlConfig);
+
+        // If database is not Microsoft SQL Server
+        if (sqlConfig.databaseType !== DatabaseType.MS_SQL_SERVER) {
+            // Return the SQL without the starting N character
+            return sql.substring(1);
         }
 
-        // Get list of keys
-        const keyList = Object.keys(object);
-
-        // For each key
-        for (let index = 0; index < keyList.length; index++) {
-            // Get key
-            const key = keyList[index];
-
-            // If not the first value in the list then add , character
-            if (index !== 0) sqlList.push(',');
-
-            // Add key name
-            sqlList.push('\"');
-            sqlList.push(key);
-            sqlList.push('\":');
-
-            // Get value
-            const value = object[key];
-
-            // If toSql function exists then call it
-            if (typeof value.toSql === 'function') {
-                // Add the convert the value
-                sqlList.push(value.toSql(sqlConfig));
-
-                // Move on to the next key
-                continue;
-            }
-
-            // If not an object
-            if (typeof value !== "object") {
-                // Add the convert of the value
-                sqlList.push(SqlConvert.valueToSql(value, sqlConfig));
-
-                // Move on to the next key
-                continue;
-            }
-
-            // If one of the objects we can convert
-            if (value instanceof Date ||
-                value instanceof Buffer ||
-                value instanceof Array) {
-                // Add the convert of the value
-                sqlList.push(SqlConvert.valueToSql(value, sqlConfig));
-
-                // Move on to the next key
-                continue;
-            }
-
-            // Otherwise we need to add this whole object
-            this._convertObjectToSql(object, sqlConfig);
-        }
-
-        // If array
-        if (object instanceof Array) {
-            // Add ending ] character
-            sqlList.push(']');
-        } else {
-            // Add starting } character
-            sqlList.push('}');
-        }
-
-        // Join and return SQL list
-        return sqlList.join('');
+        // Otherwise just return the string as is
+        return sql;
     }
 }

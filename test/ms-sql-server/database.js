@@ -1,33 +1,30 @@
 /**
  * Database
- * Used to link to MySQL database and run queries. For testing only.
+ * Used to link to MS SQL Server database and run queries. For testing only.
  */
 import Process from "process";
-import MySql from "mysql";
+import MsSql from "mssql";
 
 export default class Database {
     /**
-     * Connection connection pool.
+     * Connect config information.
      */
-    static _pool = null;
+    static _connectConfig = undefined;
 
     /**
      * Initialize the database module.
      */
     static initialize() {
-        // Create connection pool
-        Database._pool = MySql.createPool({
-            connectionLimit: 10,
-            host: 'localhost',
+        // Create connect config information
+        Database._connectConfig = {
+            server: 'localhost',
             database: 'sql_tools_test',
-            user: Process.env.MYSQL_USER,
-            password: Process.env.MYSQL_PASSWORD,
-            multipleStatements: true,
-            waitForConnections: false,
-            timezone: 'utc',
-            dateStrings: true,
-            debug:  false
-        });
+            user: Process.env.MS_SQL_SERVER_USER,
+            password: Process.env.MS_SQL_SERVER_PASSWORD,
+            options: {
+                encrypt: false
+            }
+        };
     }
 
     /**
@@ -38,27 +35,24 @@ export default class Database {
     static query(sql) {
         // Create promise
         const promise = new Promise((resolve, reject) => {
-            // Get a connection from pool
-            Database._pool.getConnection(function(error, connection) {
+            // Make a connection to the database (this is using a global pool)
+            MsSql.connect(Database._connectConfig, function (error) {
                 // If error
                 if (error) {
-                    // If connection exists then release it
-                    if (connection) connection.release();
-                    
                     // Reject the promise with the error
                     reject(error);
                     
                     // Stop here
                     return;
                 }
-                
-                // Make the query
-                connection.query(sql, null, function(error, results, fields) {
+
+                // Create request
+                const request = new MsSql.Request();
+    
+                // Run query
+                request.query(sql, function (error, results) {
                     // If error
                     if (error) {
-                        // If connection exists then release it
-                        connection.release();
-
                         // Log sql that created the error
                         console.error(sql);
 
@@ -68,13 +62,10 @@ export default class Database {
                         // Stop here
                         return;
                     }
-
-                    // Release connection now we have finished with it
-                    connection.release();
-
+    
                     // Resolve promise with the results
                     resolve(results);
-                });        
+                });
             });
         });
 

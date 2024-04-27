@@ -34,7 +34,7 @@ export default class Database {
         // Create promise
         const promise = new Promise((resolve, reject) => {
             // Make the query
-            Database._pool.query(sql, null, function(error, results, fields) {
+            Database._pool.query(sql, [], function(error, results, fields) {
                 // If error
                 if (error) {
                     // Log sql that created the error
@@ -48,7 +48,7 @@ export default class Database {
                 }
 
                 // Resolve promise with the results
-                resolve(results.rows);
+                resolve(results);
             });
         });
 

@@ -438,6 +438,10 @@ export default class TestSqlTemplate {
         Test.assertEqual(sql, 'text text');
 
         // Test identifier inside identifier value
-
+        Test.describe('processSqlValues identifier inside identifier value');
+        sqlTemplate._values = {};
+        sqlTemplate._values.test = 'hello $test world';
+        sql = sqlTemplate._processSqlValues('text $test text')
+        Test.assertEqual(sql, 'text \'hello $test world\' text');
     }
 }

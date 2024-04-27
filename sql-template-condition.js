@@ -4,18 +4,26 @@
  */
 import { Node } from "./node.js";
 import { NodeType } from "./node.js";
-import { SqlConfig } from "./sql-config.js";
-import { SqlConvert } from "./sql-convert.js";
+import { SqlConfig, DatabaseType } from "./sql-config.js";
 import { Token } from "./token.js";
 import { TokenType } from "./token.js";
 
 export class SqlTemplateCondition {
     /**
+     * Database type list.
+     */
+    static _databaseTypeList = [
+        { text: 'MYSQL', type: DatabaseType.MYSQL },
+        { text: 'POSTGRESQL', type: DatabaseType.POSTGRESQL },
+        { text: 'MS_SQL_SERVER', type: DatabaseType.MS_SQL_SERVER }
+    ];
+
+    /**
      * Default constructor.
      * @param {String} condition The condition text. 
      * @param {SqlConfig} sqlConfig The SQL config settings to use.
      */
-    constructor(condition, sqlOptions) {
+    constructor(condition, sqlConfig) {
         // If no condition text
         if (!condition) throw new Error('Missing condition data');
 
@@ -186,6 +194,18 @@ export class SqlTemplateCondition {
 
                             // Should not get here
                             throw new Error('Syntax error in condition');
+                        }
+
+                        // If DATABASE_TYPE
+                        if (token.tokenType === TokenType.DATABASE_TYPE) {
+                            // Add new node to the list
+                            nodeRowList[nodeRowIndex].nodeList.push(new Node(NodeType.TOKEN, token));
+
+                            // Finished this relation expression. Go back one row
+                            nodeRowIndex--;
+
+                            // Continue processing this token
+                            continue;
                         }
 
                         // If IDENTIFIER
@@ -550,6 +570,9 @@ export class SqlTemplateCondition {
         // Set is hex
         let isHex = false;
 
+        // Set database type
+        let databaseType = 0;
+
         // Loop until we have the next token
         while (true) {
             // Check limits
@@ -728,6 +751,30 @@ export class SqlTemplateCondition {
                     }
                 }
 
+                // Check database type
+                for (let index = 0; index < SqlTemplateCondition._databaseTypeList.length; index++) {
+                    // Get database type information
+                    const databaseTypeInfo = SqlTemplateCondition._databaseTypeList[index];
+
+                    // Check database type
+                    if (this._condition.startsWith(databaseTypeInfo.text, this._tokenIndex - 1) === false) continue;
+                    
+                    // Set token type
+                    tokenType = TokenType.DATABASE_TYPE;
+
+                    // Set database type
+                    databaseType = databaseTypeInfo.type;
+
+                    // Increase the token index
+                    this._tokenIndex += databaseTypeInfo.text.length - 1;
+
+                    // Stop looking
+                    break;
+                }
+
+                // If database type was found then process it
+                if (tokenType === TokenType.DATABASE_TYPE) break;
+
                 // If we got here then there must be an error
                 throw new Error('Syntax error. Unknown token starting at: ' + this._condition.substring(this._tokenIndex - 1));
             }
@@ -762,7 +809,6 @@ export class SqlTemplateCondition {
                     break;
                 }
                 
-
                 // If \ escape character
                 if (character === '\\') {
                     // Skip the escape character
@@ -852,6 +898,12 @@ export class SqlTemplateCondition {
                 // Convert into number
                 token.value = parseFloat(text);
             }
+        }
+
+        // If token is database type
+        if (tokenType === TokenType.DATABASE_TYPE) {
+            // Set value
+            token.value = databaseType;
         }
 
         // Return the token
@@ -948,6 +1000,15 @@ export class SqlTemplateCondition {
                 if (childNode.token.tokenType === TokenType.TRUE) return true;
                 if (childNode.token.tokenType === TokenType.FALSE) return false;
 
+                // Check if database type
+                if (childNode.token.tokenType === TokenType.DATABASE_TYPE) {
+                    // If database type matches the current SqlConfig database type
+                    if (childNode.token.value === this._sqlConfig.databaseType) return true;
+
+                    // Otherwise return not the same
+                    return false;
+                }
+
                 // If IDENTIFIER
                 if (childNode.token.tokenType === TokenType.IDENTIFIER) {
                     // Set property name
@@ -978,8 +1039,17 @@ export class SqlTemplateCondition {
 
             // If two nodes
             if (node.nodeList.length === 2) {
-                // Get IDENTIFIER child node (the second, the first one is NOT)
+                // Get IDENTIFIER or DATABASE_TYPE child node (the second, the first one is NOT)
                 const childNode = node.nodeList[1];
+
+                // Check if database type
+                if (childNode.token.tokenType === TokenType.DATABASE_TYPE) {
+                    // If database type matches the current SqlConfig database type
+                    if (childNode.token.value === this._sqlConfig.databaseType) return false;
+
+                    // Otherwise return not NOT the same
+                    return true;
+                }
 
                 // Set property name
                 const propertyName = childNode.token.value.substring(1);
@@ -1009,8 +1079,25 @@ export class SqlTemplateCondition {
             // If three nodes
             if (node.nodeList.length === 3) {
                 // Get results
-                const firstResult = this._getNodeValue(node.nodeList[0]);
-                const secondResult = this._getNodeValue(node.nodeList[2]);
+                let firstResult = this._getNodeValue(node.nodeList[0]);
+                let secondResult = this._getNodeValue(node.nodeList[2]);
+
+                // Check dates
+                if (firstResult instanceof Date && typeof secondResult === 'string') {
+                    // Convert date to string and set length to match other result
+                    firstResult = SqlTemplateCondition._convertDateToText(firstResult, this._sqlConfig);
+                    firstResult = firstResult.substring(0, secondResult.length);
+                }
+                if (typeof firstResult === 'string' && secondResult instanceof Date) {
+                    // Convert date to string and set length to match other result
+                    secondResult = SqlTemplateCondition._convertDateToText(secondResult, this._sqlConfig);
+                    secondResult = secondResult.substring(0, firstResult.length);
+                }
+                if (firstResult instanceof Date && secondResult instanceof Date) {
+                    // Convert both date results into strings
+                    firstResult = SqlTemplateCondition._convertDateToText(firstResult, this._sqlConfig);
+                    secondResult = SqlTemplateCondition._convertDateToText(secondResult, this._sqlConfig);
+                }
 
                 // Get compare token
                 const compareTokenType = node.nodeList[1].token.tokenType;
@@ -1186,7 +1273,7 @@ export class SqlTemplateCondition {
                     if (value === null) return null;
 
                     // If Date class
-                    if (value instanceof Date) return SqlConvert.dateToSql(value, this._sqlConfig);
+                    //if (value instanceof Date) return SqlTemplateCondition._convertDateToText(value, this._sqlConfig);
 
                     // Return the value as is
                     return value;
@@ -1199,5 +1286,59 @@ export class SqlTemplateCondition {
                 return this._getNodeValue(node.nodeList[2]);
             }
         }
+    }
+
+    /**
+     * Convert the date and time into a text format YYYY-MM-DD HH:MM:SS.
+     * @param {Date} date The date object to convert.
+     * @param {SqlConfig} sqlConfig The SQL config settings to use.
+     * @return {String} The date in text format.
+     */
+    static _convertDateToText(date, sqlConfig) {
+        // If SQL config is not set then use the default one
+        if (!sqlConfig) sqlConfig = SqlConfig.default;
+
+        // Get date and time values
+        let year = 0;
+        let month = 0;
+        let day = 0;
+        let hour = 0;
+        let minute = 0;
+        let second = 0;
+
+        // If UTC
+        if (sqlConfig.utc === true) {
+            // Get UTC date and time values
+            year = date.getUTCFullYear();
+            month = date.getUTCMonth() + 1;
+            day = date.getUTCDate();
+            hour = date.getUTCHours();
+            minute = date.getUTCMinutes();
+            second = date.getUTCSeconds();
+        } else {
+            // Get local date and time values
+            year = date.getFullYear();
+            month = date.getMonth() + 1;
+            day = date.getDate();
+            hour = date.getHours();
+            minute = date.getMinutes();
+            second = date.getSeconds();
+        }
+
+        // Format parts
+        const yearText = year.toString();
+        const monthText = month.toString().padStart(2, '0');
+        const dayText = day.toString().padStart(2, '0');
+        const hourText = hour.toString().padStart(2, '0');
+        const minuteText = minute.toString().padStart(2, '0');
+        const secondText = second.toString().padStart(2, '0');
+
+        // Format text date time
+        const text =
+            yearText + '-' + monthText + '-' + dayText + ' ' +
+            hourText + ':' + minuteText + ':' + secondText;
+        
+        // Return formatted text date time
+        return text;
     }
 }

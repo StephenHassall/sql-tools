@@ -1,11 +1,8 @@
--- Set database to use
-USE sql_tools_test;
-
 -- Delete any old records
 DELETE FROM test where id!=-1;
 
 -- Insert a new example record using different SQL values
-INSERT INTO test (
+INSERT INTO `test` (
   f_bool,
   f_int,
   f_decimal,

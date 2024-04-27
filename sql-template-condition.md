@@ -18,6 +18,7 @@ The condition text is split into different types of tokens.
 |Type|Information|
 |---|---|
 |`IDENTIFIER`|One of the values the format process uses. It must start with a `$` character. For example, `$age`, `$searchDate`.|
+|`DATABASE_TYPE`|The name of a database type constant. For example `MYSQL`, `POSTGRESQL`.|
 |`NUMBER`|A number literal value or a hexadecimal value. For example, `42`, `3.142`, `0xA3`.|
 |`TEXT`|A text literal value. This can start with a single or double quotation mark. Some escape characters can be used to. For example, `'Peter O\'Tool`.|
 |`MULTIPLE`|The multiple `*` character.|
@@ -59,7 +60,9 @@ flowchart LR;
     RE[Relation Expression] --> TRUE --> END
     RE[Relation Expression] --> FALSE --> END
     RE[Relation Expression] --> IDENTIFIER --> END
-    RE[Relation Expression] --> NOT --> IDENTIFIER --> END
+    RE[Relation Expression] --> NOT1["NOT"] --> IDENTIFIER --> END
+    RE[Relation Expression] --> DATABASE_TYPE --> END
+    RE[Relation Expression] --> NOT2["NOT"] --> DATABASE_TYPE --> END
     RE[Relation Expression] --> E1[Expression] --> COMPARE --> E2[Expression] --> END
 ```
 

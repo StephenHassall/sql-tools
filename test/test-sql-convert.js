@@ -276,20 +276,24 @@ export default class TestSqlConvert {
      * Test array.
      */
     static testArray() {
+        // Create configs
+        const postgreSQLConfig = new SqlConfig();
+        postgreSQLConfig.databaseType = DatabaseType.POSTGRESQL;
+
         // Test array
         Test.describe('valueToSql array');
-        let sql = SqlConvert.valueToSql([1, 2, 3]);
-        Test.assertEqual(sql, '1, 2, 3');
+        let sql = SqlConvert.valueToSql([1, 2, 3], postgreSQLConfig);
+        Test.assertEqual(sql, 'E\'{1, 2, 3}\'');
 
         // Test array of arrays
         Test.describe('valueToSql array of arrays');
-        sql = SqlConvert.valueToSql([['row1', 1], ['row2', 2], ['row3', 3]]);
-        Test.assertEqual(sql, "('row1', 1), ('row2', 2), ('row3', 3)");
+        sql = SqlConvert.valueToSql([['row1.1', 'row1.2'], ['row2.1', 'row2.2'], ['row3.1', 'row3.2']], postgreSQLConfig);
+        Test.assertEqual(sql, 'E\'{{"row1.1", "row1.2"}, {"row2.1", "row2.2"}, {"row3.1", "row3.2"}}\'');
 
         // Test array of escape text
         Test.describe('valueToSql array of escape text');
-        sql = SqlConvert.valueToSql(['\'', '\"']);
-        Test.assertEqual(sql, '\'\\\'\', \'\\\"\'');
+        sql = SqlConvert.valueToSql(['\'', '\"'], postgreSQLConfig);
+        Test.assertEqual(sql, 'E\'{"\\\'", "\\\""}\'');
 
         // Test errors
         Test.describe('arrayToSql errors');
@@ -392,7 +396,7 @@ export default class TestSqlConvert {
         // Test MySQL SqlJson escape characters
         Test.describe('valueToSql MySQL SqlJson escape characters');
         sql = SqlConvert.valueToSql(sqlJson, mySqlConfig);
-        Test.assertEqual(sql, '\'{"name":"hello \\b\\t\\r\\n\\"\\\'\\\\ world","age":50}\'');
+        Test.assertEqual(sql, '\'{"name":"hello \\\\b\\\\t\\\\r\\\\n\\\\"\\\'\\\\\\\\ world","age":50}\'');
 
         // Create SQL JSON with escape characters
         sqlJson = new SqlJson({ name: 'hello \b\f\r\n\t\"\'\\ world', age: 50 });
@@ -400,6 +404,6 @@ export default class TestSqlConvert {
         // Test PostgreSQL SqlJson escape characters
         Test.describe('valueToSql PostgresSQL SqlJson escape characters');
         sql = SqlConvert.valueToSql(sqlJson, postgreSQLConfig);
-        Test.assertEqual(sql, 'E\'{"name":"hello \\b\\f\\r\\n\\t\\"\\\'\\\\ world","age":50}\'');
+        Test.assertEqual(sql, 'E\'{"name":"hello \\\\b\\\\f\\\\r\\\\n\\\\t\\\\"\\\'\\\\\\\\ world","age":50}\'');
     }
 }

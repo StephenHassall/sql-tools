@@ -1,5 +1,7 @@
 # SQL Tools
 
+
+
 ```javascript
 
 //const sqlOptions = new SqlOptions();
@@ -82,4 +84,15 @@ VALUES
 -- INSERT INTO table (field1, field2)
 -- (12, 'hello'),
 -- (23, 'world');
+```
+
+```sql
+CREATE TABLE test (
+--if MYSQL OR POSTGRESQL
+  id SERIAL PRIMARY KEY,
+--else
+  id BIGINT IDENTENT(1,1),
+--endif
+
+);
 ```

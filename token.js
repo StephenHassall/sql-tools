@@ -9,27 +9,28 @@
  */
 export class TokenType {
     // Token types
-    static IDENTIFIER = 1;
-    static NUMBER = 2;
-    static TEXT = 3;
-    static MULTIPLE = 4;
-    static DIVIDE = 5;
-    static ADD = 6;
-    static SUBTRACT = 7;
-    static OPEN_BRACKET = 8;
-    static CLOSE_BRACKET = 9;
-    static COMPARE_EQUAL = 10;
-    static COMPARE_NOT_EQUAL = 11;
-    static COMPARE_LESS = 12;
-    static COMPARE_GREATER = 13;
-    static COMPARE_LESS_EQUAL = 14;
-    static COMPARE_GREATER_EQUAL = 15;
-    static NOT = 16;
-    static TRUE = 17;
-    static FALSE = 18;
-    static NULL = 19;
-    static AND = 20;
-    static OR = 21;
+    static DATABASE_TYPE = 1;
+    static IDENTIFIER = 2;
+    static NUMBER = 3;
+    static TEXT = 4;
+    static MULTIPLE = 5;
+    static DIVIDE = 6;
+    static ADD = 7;
+    static SUBTRACT = 8;
+    static OPEN_BRACKET = 9;
+    static CLOSE_BRACKET = 10;
+    static COMPARE_EQUAL = 11;
+    static COMPARE_NOT_EQUAL = 12;
+    static COMPARE_LESS = 13;
+    static COMPARE_GREATER = 14;
+    static COMPARE_LESS_EQUAL = 15;
+    static COMPARE_GREATER_EQUAL = 16;
+    static NOT = 17;
+    static TRUE = 18;
+    static FALSE = 19;
+    static NULL = 20;
+    static AND = 21;
+    static OR = 22;
 }
 
 /**

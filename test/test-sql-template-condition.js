@@ -2,6 +2,7 @@
  * Test SQL Template Condition.
  */
 import Test from "./test.js";
+import { SqlConfig, DatabaseType } from "../sql-config.js";
 import { SqlTemplateCondition } from "../sql-template-condition.js";
 import { TokenType } from "../token.js";
 import { NodeType } from "../node.js";
@@ -26,7 +27,7 @@ export default class TestSqlTemplateCondition {
     static testGetNextToken() {
         // Test empty1
         Test.describe('getNextToken empty');
-        let condition = new SqlTemplateCondition('true', true);
+        let condition = new SqlTemplateCondition('true');
         condition._condition = '';
         condition._tokenIndex = 0;
         let token = condition._getNextToken();
@@ -34,7 +35,7 @@ export default class TestSqlTemplateCondition {
 
         // Test white space
         Test.describe('getNextToken white space');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '   ';
         condition._tokenIndex = 0;
         token = condition._getNextToken();
@@ -42,16 +43,34 @@ export default class TestSqlTemplateCondition {
 
         // Test white space with equal
         Test.describe('getNextToken white space with equal');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = ' = ';
         condition._tokenIndex = 0;
         token = condition._getNextToken();
         Test.assert(token);
         Test.assertEqual(token.tokenType, TokenType.COMPARE_EQUAL);
 
+        // Test database type
+        Test.describe('getNextToken database type');
+        condition = new SqlTemplateCondition('true');
+        condition._condition = ' MYSQL POSTGRESQL MS_SQL_SERVER  ';
+        condition._tokenIndex = 0;
+        token = condition._getNextToken();
+        Test.assert(token);
+        Test.assertEqual(token.tokenType, TokenType.DATABASE_TYPE);
+        Test.assertEqual(token.value, DatabaseType.MYSQL);
+        token = condition._getNextToken();
+        Test.assert(token);
+        Test.assertEqual(token.tokenType, TokenType.DATABASE_TYPE);
+        Test.assertEqual(token.value, DatabaseType.POSTGRESQL);
+        token = condition._getNextToken();
+        Test.assert(token);
+        Test.assertEqual(token.tokenType, TokenType.DATABASE_TYPE);
+        Test.assertEqual(token.value, DatabaseType.MS_SQL_SERVER);
+
         // Test strings
         Test.describe('getNextToken strings');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = ' "hello\\"world" \'hello\\\'world\' "hello\'world" \'hello"world\'  ';
         condition._tokenIndex = 0;
         token = condition._getNextToken();
@@ -73,7 +92,7 @@ export default class TestSqlTemplateCondition {
 
         // Test numbers
         Test.describe('getNextToken numbers');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = ' 1234 1234.567 0xAD0012E3 ';
         condition._tokenIndex = 0;
         token = condition._getNextToken();
@@ -91,7 +110,7 @@ export default class TestSqlTemplateCondition {
 
         // Test identifier
         Test.describe('getNextToken identifiers');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = ' $test $test1 $test_var2 ';
         condition._tokenIndex = 0;
         token = condition._getNextToken();
@@ -109,7 +128,7 @@ export default class TestSqlTemplateCondition {
 
         // Test other tokens
         Test.describe('getNextToken other tokens');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = ' = == === != !== <> >= <= > < ( ) + - * / ! && AND || OR true false null ';
         condition._tokenIndex = 0;
         token = condition._getNextToken();
@@ -187,7 +206,7 @@ export default class TestSqlTemplateCondition {
 
         // Test no white space
         Test.describe('getNextToken no white space');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '$test1==="hello"&&($test2===13||!$test3)AND$test4!=true';
         condition._tokenIndex = 0;
         token = condition._getNextToken();
@@ -247,7 +266,7 @@ export default class TestSqlTemplateCondition {
 
         // Test endings
         Test.describe('getNextToken endings');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '123 $test';
         condition._tokenIndex = 0;
         token = condition._getNextToken();
@@ -309,7 +328,7 @@ export default class TestSqlTemplateCondition {
 
         // Test invalid tokens (syntax errors)
         Test.describe('getNextToken invalid tokens');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = 'this is an error';
         condition._tokenIndex = 0;
         try {
@@ -321,7 +340,7 @@ export default class TestSqlTemplateCondition {
 
         // Test invalid strings
         Test.describe('getNextToken invalid strings');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = ' "no closing quotation';
         condition._tokenIndex = 0;
         try {
@@ -338,17 +357,15 @@ export default class TestSqlTemplateCondition {
         } catch (e) {
             Test.assertEqual(e.message, 'Missing closing string quotation mark');
         }
-
-
     }
 
     /**
      * Test the build node tree.
      */
     static testBuild() {
-        // Test $test
+        // Test true
         Test.describe('build true');
-        let condition = new SqlTemplateCondition('true', true);
+        let condition = new SqlTemplateCondition('true');
         condition._condition = 'true';
         condition._tokenIndex = 0;
         condition._build();
@@ -361,9 +378,25 @@ export default class TestSqlTemplateCondition {
         Test.assertEqual(relationExpression.nodeList[0].nodeType, NodeType.TOKEN);
         Test.assertEqual(relationExpression.nodeList[0].token.tokenType, TokenType.TRUE);
 
+        // Test MYSQL
+        Test.describe('build MYSQL');
+        condition = new SqlTemplateCondition('true');
+        condition._condition = 'MYSQL';
+        condition._tokenIndex = 0;
+        condition._build();
+        booleanExpression = condition._booleanNode;
+        Test.assertEqual(booleanExpression.nodeType, NodeType.BOOL_EXPRESSION);
+        Test.assertEqual(booleanExpression.nodeList.length, 1);
+        relationExpression = booleanExpression.nodeList[0];
+        Test.assertEqual(relationExpression.nodeType, NodeType.RELATION_EXPRESSION);
+        Test.assertEqual(relationExpression.nodeList.length, 1);
+        Test.assertEqual(relationExpression.nodeList[0].nodeType, NodeType.TOKEN);
+        Test.assertEqual(relationExpression.nodeList[0].token.tokenType, TokenType.DATABASE_TYPE);
+        Test.assertEqual(relationExpression.nodeList[0].token.value, DatabaseType.MYSQL);
+
         // Test $test
         Test.describe('build $test');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '$test';
         condition._tokenIndex = 0;
         condition._build();
@@ -378,7 +411,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test=1
         Test.describe('build $test=1');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '$test=1';
         condition._tokenIndex = 0;
         condition._build();
@@ -417,7 +450,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1=1 && $test2=2
         Test.describe('build $test1=1 && $test2=2');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '$test1=1 && $test2=2';
         condition._tokenIndex = 0;
         condition._build();
@@ -491,7 +524,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1 && $test
         Test.describe('build $test1 && $test2');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '$test1 && $test2';
         condition._tokenIndex = 0;
         condition._build();
@@ -517,7 +550,7 @@ export default class TestSqlTemplateCondition {
 
         // Test !$test1
         Test.describe('build !$test1 ');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '!$test1';
         condition._tokenIndex = 0;
         condition._build();
@@ -536,7 +569,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1=1 && ($test2=2 || $test3=3)
         Test.describe('build $test1=1 && ($test2=2 || $test3=3)');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '$test1=1 && ($test2=2 || $test3=3)';
         condition._tokenIndex = 0;
         condition._build();
@@ -639,7 +672,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1===true
         Test.describe('build $test1===true');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '$test1===true';
         condition._tokenIndex = 0;
         condition._build();
@@ -678,7 +711,7 @@ export default class TestSqlTemplateCondition {
 
         // Test true==$test1
         Test.describe('build true==$test1');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = 'true==$test1';
         condition._tokenIndex = 0;
         condition._build();
@@ -717,7 +750,7 @@ export default class TestSqlTemplateCondition {
 
         // Test true
         Test.describe('build true');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = 'true';
         condition._tokenIndex = 0;
         condition._build();
@@ -732,7 +765,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1===-123
         Test.describe('build $test1===-123');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '$test1===-123';
         condition._tokenIndex = 0;
         condition._build();
@@ -773,7 +806,7 @@ export default class TestSqlTemplateCondition {
 
         // Test 12+34=56-78
         Test.describe('build 12+34=56-78');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '12+34=56-78';
         condition._tokenIndex = 0;
         condition._build();
@@ -840,7 +873,7 @@ export default class TestSqlTemplateCondition {
 
         // Test 12*34=56/78
         Test.describe('build 12*34=56/78');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '12*34=56/78';
         condition._tokenIndex = 0;
         condition._build();
@@ -901,7 +934,7 @@ export default class TestSqlTemplateCondition {
 
         // Test error white space only
         Test.describe('build error white space only');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '  ';
         condition._tokenIndex = 0;
         try {
@@ -913,7 +946,7 @@ export default class TestSqlTemplateCondition {
 
         // Test error 123
         Test.describe('build error 123');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '123';
         condition._tokenIndex = 0;
         try {
@@ -925,7 +958,7 @@ export default class TestSqlTemplateCondition {
 
         // Test error $test1==
         Test.describe('build error $test1==');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '$test1==';
         condition._tokenIndex = 0;
         try {
@@ -937,7 +970,7 @@ export default class TestSqlTemplateCondition {
 
         // Test error ($test1==123
         Test.describe('build error ($test1==123');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '($test1==123';
         condition._tokenIndex = 0;
         try {
@@ -949,7 +982,7 @@ export default class TestSqlTemplateCondition {
 
         // Test error $test1==1+
         Test.describe('build error $test1==1+');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '$test1==1+';
         condition._tokenIndex = 0;
         try {
@@ -961,7 +994,7 @@ export default class TestSqlTemplateCondition {
 
         // Test error $test1==1*
         Test.describe('build error $test1==1*');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '$test1==1*';
         condition._tokenIndex = 0;
         try {
@@ -973,7 +1006,7 @@ export default class TestSqlTemplateCondition {
 
         // Test error $test1==(
         Test.describe('build error $test1==(');
-        condition = new SqlTemplateCondition('true', true);
+        condition = new SqlTemplateCondition('true');
         condition._condition = '$test1==(';
         condition._tokenIndex = 0;
         try {
@@ -986,15 +1019,15 @@ export default class TestSqlTemplateCondition {
         // Test errors
         Test.describe('build errors');
         try {
-            condition = new SqlTemplateCondition('$test=true', true);
-            condition = new SqlTemplateCondition('$test==false', true);
-            condition = new SqlTemplateCondition('$test<>$test AND ($test!=NULL OR $test==123)', true);
-            condition = new SqlTemplateCondition('($test!=NULL OR $test==123)', true);
-            condition = new SqlTemplateCondition('$test!=NULL AND $test>"2024-05-17 00:00:00"', true);
-            condition = new SqlTemplateCondition('$test>-123 && $test<23 + 42', true);
-            condition = new SqlTemplateCondition('$test+$test2>$test3-$test4', true);
-            condition = new SqlTemplateCondition('$test*$test2<$test3/$test4', true);
-            condition = new SqlTemplateCondition('($test1==1 AND ((($test2=2 OR $test3=3) AND ($test4=4 OR $test5=5)) OR $test6=6))', true);
+            condition = new SqlTemplateCondition('$test=true');
+            condition = new SqlTemplateCondition('$test==false');
+            condition = new SqlTemplateCondition('$test<>$test AND ($test!=NULL OR $test==123)');
+            condition = new SqlTemplateCondition('($test!=NULL OR $test==123)');
+            condition = new SqlTemplateCondition('$test!=NULL AND $test>"2024-05-17 00:00:00"');
+            condition = new SqlTemplateCondition('$test>-123 && $test<23 + 42');
+            condition = new SqlTemplateCondition('$test+$test2>$test3-$test4');
+            condition = new SqlTemplateCondition('$test*$test2<$test3/$test4');
+            condition = new SqlTemplateCondition('($test1==1 AND ((($test2=2 OR $test3=3) AND ($test4=4 OR $test5=5)) OR $test6=6))');
         } catch (e) {
             Test.assert();
         }
@@ -1011,10 +1044,21 @@ export default class TestSqlTemplateCondition {
             test3: 3
         };
 
+        // Test database type
+        let sqlConfigTestDatabaseType = new SqlConfig();
+        sqlConfigTestDatabaseType.databaseType = DatabaseType.MYSQL;
+        Test.describe('getResult MYSQL');
+        let condition = new SqlTemplateCondition('MYSQL', sqlConfigTestDatabaseType);
+        let result = condition.getResult(values);
+        Test.assertEqual(result, true);
+        sqlConfigTestDatabaseType.databaseType = DatabaseType.POSTGRESQL;
+        result = condition.getResult(values);
+        Test.assertEqual(result, false);
+
         // Test $test1=1
         Test.describe('getResult $test1=1');
-        let condition = new SqlTemplateCondition('$test1=1', true);
-        let result = condition.getResult(values);
+        condition = new SqlTemplateCondition('$test1=1');
+        result = condition.getResult(values);
         Test.assertEqual(result, true);
         values.test1 = 0;
         result = condition.getResult(values);
@@ -1022,7 +1066,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1=1 && ($test2=2 || $test3=3)
         Test.describe('getResult $test1=1 && ($test2=2 || $test3=3)');
-        condition = new SqlTemplateCondition('$test1=1 && ($test2=2 || $test3=3)', true);
+        condition = new SqlTemplateCondition('$test1=1 && ($test2=2 || $test3=3)');
         values.test1 = 1;
         values.test2 = 2;
         values.test3 = 3;
@@ -1056,7 +1100,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $boolean=true
         Test.describe('getResult $boolean=true');
-        condition = new SqlTemplateCondition('$boolean=true', true);
+        condition = new SqlTemplateCondition('$boolean=true');
         values.boolean = true;
         result = condition.getResult(values);
         Test.assertEqual(result, true);
@@ -1066,7 +1110,7 @@ export default class TestSqlTemplateCondition {
 
         // Test true==$boolean
         Test.describe('getResult true==$boolean');
-        condition = new SqlTemplateCondition('true==$boolean', true);
+        condition = new SqlTemplateCondition('true==$boolean');
         values.boolean = true;
         result = condition.getResult(values);
         Test.assertEqual(result, true);
@@ -1076,7 +1120,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1=-123
         Test.describe('getResult $test1=-123');
-        condition = new SqlTemplateCondition('$test1=-123', true);
+        condition = new SqlTemplateCondition('$test1=-123');
         values.test1 = -123;
         result = condition.getResult(values);
         Test.assertEqual(result, true);
@@ -1089,7 +1133,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1+12=$test2-34
         Test.describe('getResult $test1+12=$test2-34');
-        condition = new SqlTemplateCondition('$test1+12=$test2-34', true);
+        condition = new SqlTemplateCondition('$test1+12=$test2-34');
         values.test1 = 10;
         values.test2 = 56;
         result = condition.getResult(values);
@@ -1101,7 +1145,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1*2=$test2/4
         Test.describe('getResult $test1*2=$test2/4');
-        condition = new SqlTemplateCondition('$test1*2=$test2/4', true);
+        condition = new SqlTemplateCondition('$test1*2=$test2/4');
         values.test1 = 10;
         values.test2 = 80;
         result = condition.getResult(values);
@@ -1113,7 +1157,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $testNull=NULL
         Test.describe('getResult $testNull=NULL');
-        condition = new SqlTemplateCondition('$testNull=NULL', true);
+        condition = new SqlTemplateCondition('$testNull=NULL');
         values.testNull = null;
         result = condition.getResult(values);
         Test.assertEqual(result, true);
@@ -1123,7 +1167,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $testUndefined=null
         Test.describe('getResult $testUndefined=null');
-        condition = new SqlTemplateCondition('$testUndefined=null', true);
+        condition = new SqlTemplateCondition('$testUndefined=null');
         values.testUndefined = undefined;
         result = condition.getResult(values);
         Test.assertEqual(result, true);
@@ -1133,7 +1177,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $testUndefined
         Test.describe('getResult $testUndefined');
-        condition = new SqlTemplateCondition('$testUndefined', true);
+        condition = new SqlTemplateCondition('$testUndefined');
         values.testUndefined = undefined;
         result = condition.getResult(values);
         Test.assertEqual(result, false);
@@ -1158,7 +1202,7 @@ export default class TestSqlTemplateCondition {
 
         // Test !$testUndefined
         Test.describe('getResult !$testUndefined');
-        condition = new SqlTemplateCondition('!$testUndefined', true);
+        condition = new SqlTemplateCondition('!$testUndefined');
         values.testUndefined = undefined;
         result = condition.getResult(values);
         Test.assertEqual(result, true);
@@ -1183,7 +1227,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1>10
         Test.describe('getResult $test1>10');
-        condition = new SqlTemplateCondition('$test1>10', true);
+        condition = new SqlTemplateCondition('$test1>10');
         values.test1 = 11;
         result = condition.getResult(values);
         Test.assertEqual(result, true);
@@ -1196,7 +1240,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1>=10
         Test.describe('getResult $test1>=10');
-        condition = new SqlTemplateCondition('$test1>=10', true);
+        condition = new SqlTemplateCondition('$test1>=10');
         values.test1 = 11;
         result = condition.getResult(values);
         Test.assertEqual(result, true);
@@ -1209,7 +1253,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1<10
         Test.describe('getResult $test1<10');
-        condition = new SqlTemplateCondition('$test1<10', true);
+        condition = new SqlTemplateCondition('$test1<10');
         values.test1 = 9;
         result = condition.getResult(values);
         Test.assertEqual(result, true);
@@ -1222,7 +1266,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1<=10
         Test.describe('getResult $test1<=10');
-        condition = new SqlTemplateCondition('$test1<=10', true);
+        condition = new SqlTemplateCondition('$test1<=10');
         values.test1 = 9;
         result = condition.getResult(values);
         Test.assertEqual(result, true);
@@ -1235,7 +1279,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1!=10
         Test.describe('getResult $test1!=10');
-        condition = new SqlTemplateCondition('$test1!=10', true);
+        condition = new SqlTemplateCondition('$test1!=10');
         values.test1 = 10;
         result = condition.getResult(values);
         Test.assertEqual(result, false);
@@ -1248,7 +1292,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1==$test2
         Test.describe('getResult $test1==$test2');
-        condition = new SqlTemplateCondition('$test1==$test2', true);
+        condition = new SqlTemplateCondition('$test1==$test2');
         values.test1 = 10;
         values.test2 = 10;
         result = condition.getResult(values);
@@ -1259,7 +1303,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $testString=="hello world"
         Test.describe('getResult $testString=="hello world"');
-        condition = new SqlTemplateCondition('$testString=="hello world"', true);
+        condition = new SqlTemplateCondition('$testString=="hello world"');
         values.testString = 'hello world';
         result = condition.getResult(values);
         Test.assertEqual(result, true);
@@ -1278,7 +1322,7 @@ export default class TestSqlTemplateCondition {
 
         // Test $test1String==$test2String
         Test.describe('getResult $test1String==$test2String');
-        condition = new SqlTemplateCondition('$test1String==$test2String', true);
+        condition = new SqlTemplateCondition('$test1String==$test2String');
         values.test1String = 'hello world';
         values.test2String = 'hello world';
         result = condition.getResult(values);
@@ -1299,9 +1343,13 @@ export default class TestSqlTemplateCondition {
         result = condition.getResult(values);
         Test.assertEqual(result, true);
 
+        // Create SQL config date
+        const sqlConfigDate = new SqlConfig();
+        sqlConfigDate.utc = true;
+
         // Test $testDate=="date"
         Test.describe('getResult $testDate=="date"');
-        condition = new SqlTemplateCondition('$testDate=="2024-05-17 00:00:00"', true);
+        condition = new SqlTemplateCondition('$testDate=="2024-05-17 00:00:00"', sqlConfigDate);
         values.testDate = new Date(Date.UTC(2024, 4, 17, 0 ,0, 0, 0));
         result = condition.getResult(values);
         Test.assertEqual(result, true);
@@ -1310,15 +1358,57 @@ export default class TestSqlTemplateCondition {
         Test.assertEqual(result, false);
 
         // Local date
-        condition = new SqlTemplateCondition('$testDate=="2024-05-17 00:00:00"', false);
+        sqlConfigDate.utc = false;
+        condition = new SqlTemplateCondition('$testDate=="2024-05-17 00:00:00"', sqlConfigDate);
         values.testDate = new Date(2024, 4, 17, 0 ,0, 0, 0);
         result = condition.getResult(values);
         Test.assertEqual(result, true);
         values.testDate = new Date(2023, 1, 23, 0 ,0, 0, 0);
         result = condition.getResult(values);
         Test.assertEqual(result, false);
-        // May fail if timezone is same as UTC (UK!?)
-        values.testDate = new Date(Date.UTC(2024, 4, 17, 0 ,0, 0, 0));
+
+        // Test $testDate=="date only"
+        Test.describe('getResult $testDate=="date only"');
+        condition = new SqlTemplateCondition('$testDate=="2024-05-17"', sqlConfigDate);
+        values.testDate = new Date(Date.UTC(2024, 4, 17, 2, 3, 4, 0));
+        result = condition.getResult(values);
+        Test.assertEqual(result, true);
+        values.testDate = new Date(Date.UTC(2023, 1, 23, 2, 3, 4, 0));
+        result = condition.getResult(values);
+        Test.assertEqual(result, false);
+
+        // Test "date only"==$testDate
+        Test.describe('getResult "date only"==$testDate');
+        condition = new SqlTemplateCondition('"2024-05-17"==$testDate', sqlConfigDate);
+        values.testDate = new Date(Date.UTC(2024, 4, 17, 3, 4, 5, 0));
+        result = condition.getResult(values);
+        Test.assertEqual(result, true);
+        values.testDate = new Date(Date.UTC(2023, 1, 23, 3, 4, 5, 0));
+        result = condition.getResult(values);
+        Test.assertEqual(result, false);
+
+        // Test $testDate1==$testDate2
+        Test.describe('getResult $testDate1==$testDate2');
+        condition = new SqlTemplateCondition('$testDate1==$testDate2', sqlConfigDate);
+        values.testDate1 = new Date(Date.UTC(2024, 4, 17, 3, 4, 5, 0));
+        values.testDate2 = new Date(Date.UTC(2024, 4, 17, 3, 4, 5, 0));
+        result = condition.getResult(values);
+        Test.assertEqual(result, true);
+        values.testDate1 = new Date(Date.UTC(2023, 1, 23, 2, 4, 5, 0));
+        values.testDate2 = new Date(Date.UTC(2024, 4, 17, 4, 5, 6, 0));
+        result = condition.getResult(values);
+        Test.assertEqual(result, false);
+
+        // Test $testDate>="date only"
+        Test.describe('getResult $testDate>="date only"');
+        condition = new SqlTemplateCondition('$testDate>="2024-05-17"', sqlConfigDate);
+        values.testDate = new Date(Date.UTC(2024, 4, 17, 3, 4, 5, 0));
+        result = condition.getResult(values);
+        Test.assertEqual(result, true);
+        values.testDate = new Date(Date.UTC(2024, 5, 3, 12, 3, 23, 0));
+        result = condition.getResult(values);
+        Test.assertEqual(result, true);
+        values.testDate = new Date(Date.UTC(2023, 1, 23, 2, 3, 4, 0));
         result = condition.getResult(values);
         Test.assertEqual(result, false);
     }

@@ -1,6 +1,3 @@
--- Set database to use
-USE sql_tools_test;
-
 -- Drop the test table if it already exists
 DROP TABLE IF EXISTS test;
 
