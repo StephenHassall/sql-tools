@@ -22,12 +22,28 @@ export class SqlTemplate {
     /**
      * Identifier regex. This is used to look for $value parts.
      */
-    static _regex = RegExp(
+    static _identifierRegex = RegExp(
         // Identifier group
         // \$ = starts with the "$" character
         // \w = must start with a character (including _)
         // [\w\d]+ = contain zero or more word or digit characters
         '(?<identifier>\\\$\\w[\\w\\d]*)',
+
+        // Global
+        'g');
+
+    /**
+     * Comments regex. This is used to look for comments in the SQL.
+     */
+    static _commentRegex = RegExp(
+        // Comment block /*....*/
+        // \/\* = starts with /*
+        // [\s\S][^*][^\/]* = any white space and non white space character, but no /*
+        // *\*\/ = ends with */
+        '(?<commentBlock>\\/\\*[\\s\\S][^*][^\\/]*\\*\\/)|' +
+
+        // Comment line
+        '(?<commentLine>[#|\\--].*$|\\r|\\n)',
 
         // Global
         'g');
@@ -615,7 +631,7 @@ export class SqlTemplate {
 
         // Replace the sql identifiers with their values
         const processedSql = sql.replace(
-            SqlTemplate._regex,
+            SqlTemplate._identifierRegex,
             (fullMatch, identifier) => {
                 // If not identifier then return full match
                 if (!identifier) return fullMatch;
@@ -645,5 +661,37 @@ export class SqlTemplate {
 
         // Return the processed SQL
         return processedSql;
+    }
+
+    /**
+     * Remove any comments from the SQL
+     * @param {String} sql The SQL that has been processed but may still contain comments.
+     * @return {String} The SQL text without any comments.
+     */
+    _removeComments(sql) {
+        // Remove the comments from the SQL
+        const processedSql = sql.replace(
+            SqlTemplate._commentRegex,
+            (
+                fullMatch,
+                commentBlock,
+                commentLine) => {
+                // Do not replace the comments with anything
+                if (fullMatch) return fullMatch;
+                return '';
+            }
+        );
+
+        // Return the processed SQL
+        return processedSql;
+    }
+
+    /**
+     * Make the SQL into a single line. Removes any new line characters and replaces them with spaces.
+     * @param {String} sql The SQL that may contain multiple lines of text.
+     * @return {String} The SQL text all on one line.
+     */
+    _makeSingleLine(sql) {
+        
     }
 }

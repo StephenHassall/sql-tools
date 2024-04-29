@@ -185,7 +185,7 @@ export default class TestPostgreSql {
         values.fEnum = 'two';
         values.fArray1 = [11, 22, 33, 44];
         values.fArray2 = [['hello', 'world'],['abc', 'def']];
-        values.fUuuid = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22'
+        values.fUuuid = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22';
 
         // Set JSON
         const fObject = { property1: 567, property2: "te\"st\\2", property3: "te\'st2" };

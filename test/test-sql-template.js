@@ -19,7 +19,8 @@ export default class TestSqlTemplate {
         //await TestSqlTemplate.testCreateBlockTree();
         //await TestSqlTemplate.testCheckBlockTreeError();
         //await TestSqlTemplate.testProcessBlockTree();
-        TestSqlTemplate.testProcessSqlValues();
+        //TestSqlTemplate.testProcessSqlValues();
+        TestSqlTemplate.testRemoveComments();
     }
 
     /**
@@ -443,5 +444,92 @@ export default class TestSqlTemplate {
         sqlTemplate._values.test = 'hello $test world';
         sql = sqlTemplate._processSqlValues('text $test text')
         Test.assertEqual(sql, 'text \'hello $test world\' text');
+    }
+
+    /**
+     * Test the remove comments.
+     */
+    static testRemoveComments() {
+        // Create Sql template
+        let sqlTemplate = new SqlTemplate('true');
+
+        // Test no comments
+        Test.describe('removeComments empty');
+        let sql = sqlTemplate._removeComments('line 1\nline 2\nline 3');
+        Test.assertEqual(sql, 'line 1\nline 2\nline 3');
+
+        // Test no comment block
+        Test.describe('removeComments comment block');
+        sql = sqlTemplate._removeComments('/**/');
+        Test.assertEqual(sql, '');
+        sql = sqlTemplate._removeComments('/*abc*/');
+        Test.assertEqual(sql, '');
+        sql = sqlTemplate._removeComments('hello/**/world');
+        Test.assertEqual(sql, 'helloworld');
+        sql = sqlTemplate._removeComments('hello/*abc*/world');
+        Test.assertEqual(sql, 'helloworld');
+        sql = sqlTemplate._removeComments('hello/*line 1\nline 2\n\rline 3\r*/world');
+        Test.assertEqual(sql, 'helloworld');
+        sql = sqlTemplate._removeComments('hello/**/');
+        Test.assertEqual(sql, 'hello');
+        sql = sqlTemplate._removeComments('/**/world');
+        Test.assertEqual(sql, 'world');
+        sql = sqlTemplate._removeComments('hello/*abc*/');
+        Test.assertEqual(sql, 'hello');
+        sql = sqlTemplate._removeComments('/*abc*/world');
+        Test.assertEqual(sql, 'world');
+        sql = sqlTemplate._removeComments('hello/*line 1\nline 2\n\rline 3\r*/');
+        Test.assertEqual(sql, 'hello');
+        sql = sqlTemplate._removeComments('/*line 1\nline 2\n\rline 3\r*/world');
+        Test.assertEqual(sql, 'world');
+
+        // Test no comment line
+        Test.describe('removeComments comment line');
+        sql = sqlTemplate._removeComments('--');
+        Test.assertEqual(sql, '');
+        sql = sqlTemplate._removeComments('--nothing');
+        Test.assertEqual(sql, '');
+        sql = sqlTemplate._removeComments('--nothing\n');
+        Test.assertEqual(sql, '');
+        sql = sqlTemplate._removeComments('--nothing\n\r');
+        Test.assertEqual(sql, '');
+        sql = sqlTemplate._removeComments('--nothing\r');
+        Test.assertEqual(sql, '');
+
+        sql = sqlTemplate._removeComments('--\nhello');
+        Test.assertEqual(sql, 'hello');
+        sql = sqlTemplate._removeComments('--nothing\nhello');
+        Test.assertEqual(sql, 'hello');
+        sql = sqlTemplate._removeComments('--nothing\nhello');
+        Test.assertEqual(sql, 'hello');
+        sql = sqlTemplate._removeComments('--nothing\n\rhello');
+        Test.assertEqual(sql, 'hello');
+        sql = sqlTemplate._removeComments('--nothing\rhello');
+        Test.assertEqual(sql, 'hello');
+
+        sql = sqlTemplate._removeComments('hello\n--');
+        Test.assertEqual(sql, 'hello\n');
+        sql = sqlTemplate._removeComments('hello\n--nothing');
+        Test.assertEqual(sql, 'hello\n');
+        sql = sqlTemplate._removeComments('hello\n--nothing\n');
+        Test.assertEqual(sql, 'hello\n');
+        sql = sqlTemplate._removeComments('hello\n--nothing\n\r');
+        Test.assertEqual(sql, 'hello\n');
+        sql = sqlTemplate._removeComments('hello\n--nothing\r');
+        Test.assertEqual(sql, 'hello\n');
+
+        sql = sqlTemplate._removeComments('#');
+        Test.assertEqual(sql, '');
+        sql = sqlTemplate._removeComments('#nothing');
+        Test.assertEqual(sql, '');
+        sql = sqlTemplate._removeComments('#nothing\n');
+        Test.assertEqual(sql, '');
+        sql = sqlTemplate._removeComments('#nothing\n\r');
+        Test.assertEqual(sql, '');
+        sql = sqlTemplate._removeComments('#nothing\r');
+        Test.assertEqual(sql, '');
+
+        sql = sqlTemplate._removeComments('line 1\n/*line 2\n*/line 3\n--line 4\nline 5\n#line 6\nline 7');
+        Test.assertEqual(sql, 'line \nline 3\nline 5\nline 7');
     }
 }

@@ -12,6 +12,7 @@ export class DatabaseType {
     static MYSQL = 1;
     static POSTGRESQL = 2;
     static MS_SQL_SERVER = 3;
+    static ORACLE = 4;
 }
 
 /**

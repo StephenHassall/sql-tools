@@ -25,8 +25,8 @@ export default class TestMsSqlServer {
 
         // Perform tests
         await TestMsSqlServer.testCreateTable();
-        await TestMsSqlServer.testInsertSampleRecord();
-        //await TestMsSqlServer.testInsertRecordWithValues();
+        //await TestMsSqlServer.testInsertSampleRecord();
+        await TestMsSqlServer.testInsertRecordWithValues();
     }
 
     /**
@@ -170,24 +170,25 @@ export default class TestMsSqlServer {
 
         // Add values
         values.testTable = new SqlIdentifier('test');
-        values.fBool = false;
-        values.fInt = 456;
-        values.fDecimal = 3.142;
+        values.fDecimal = 2.718;
+        values.fInt = 456
+        values.fBit = 0;
+        values.fFloat = 987.123;
+        values.fReal = 543.345;
         values.fDate = new Date(Date.UTC(2024, 3, 20, 11, 35, 23));
-        values.fTime = new Date(Date.UTC(2022, 2, 2, 8, 24, 56));
         values.fDatetime = new Date(Date.UTC(2023, 2, 19, 10, 34, 22));
-        values.fDatetimeMillisecond = new Date(Date.UTC(2020, 1, 18, 9, 33, 21, 987));
-        values.fTimestamp = new Date(Date.UTC(2019, 0, 17, 7, 25, 46));
-        values.fYear = 2038;
-        values.fChar = 'XYZ';
-        values.fVarchar = 'hello \0\b\t\n\r\Z\"\'\\ world';
-        values.fBlob = Buffer.from([0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]);
-        values.fText = 'testing \"MySQL\' text';
-        values.fEnum = 'two';
+        values.fDatetime2 = new Date(Date.UTC(2020, 1, 18, 9, 33, 21, 987));
+        values.fTime = new Date(Date.UTC(2019, 0, 17, 7, 25, 46));
+        values.fChar = 'ABC';
+        values.fVarchar = 'hello\"\'\\world';
+        values.fNchar = 'xyz';
+        values.fNvarchar = 'testing unicode text';
+        values.fVarbinary = Buffer.from([0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]);
+        values.fUniqueidentifier = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22';
 
         // Set JSON
         const fObject = { property1: 567, property2: "te\"st\\2", property3: "te\'st2" };
-        values.fJson = new SqlJson(fObject);
+        values.fNvarcharJson = new SqlJson(fObject);
 
         // Format the SQL template with values
         let sql = sqlTemplate.format(values);
@@ -208,56 +209,72 @@ export default class TestMsSqlServer {
         // Run the SQL query
         result = await Database.query(selectSql);
         Test.assert(result);
-        Test.assertEqual(result.length, 1);
+        Test.assertEqual(result.recordset.length, 1);
 
         // Set first (and only) record
-        const record = result[0];
-        Test.assert(record.f_bool);
-        Test.assertEqual(record.f_bool, 0);
+        const record = result.recordset[0];
+        Test.assert(record.f_decimal);
+        Test.assertEqual(record.f_decimal, 2.718);
         Test.assert(record.f_int);
         Test.assertEqual(record.f_int, 456);
-        Test.assert(record.f_decimal);
-        Test.assertEqual(record.f_decimal, 3.142);
+        Test.assert(record.f_bit);
+        Test.assertEqual(record.f_bit, false);
+        Test.assert(record.f_float);
+        Test.assertEqual(record.f_float, 987.123);
+        Test.assert(record.f_real);
+        Test.assertEqual(record.f_real.toFixed(3), '543.345');
         Test.assert(record.f_date);
-        Test.assertEqual(record.f_date, '2024-04-20');
-        Test.assert(record.f_time);
-        Test.assertEqual(record.f_time, '08:24:56');
+        Test.assertEqual(record.f_date.getUTCFullYear(), 2024);
+        Test.assertEqual(record.f_date.getUTCMonth(), 3);
+        Test.assertEqual(record.f_date.getUTCDate(), 20);
         Test.assert(record.f_datetime);
-        Test.assertEqual(record.f_datetime, '2023-03-19 10:34:22');
-        Test.assert(record.f_datetime_millisecond);
-        Test.assertEqual(record.f_datetime_millisecond, '2020-02-18 09:33:21.987');
-        Test.assert(record.f_timestamp);
-        Test.assertEqual(record.f_timestamp, '2019-01-17 07:25:46');
-        Test.assert(record.f_year);
-        Test.assertEqual(record.f_year, 2038);
+        Test.assertEqual(record.f_datetime.getUTCFullYear(), 2023);
+        Test.assertEqual(record.f_datetime.getUTCMonth(), 2);
+        Test.assertEqual(record.f_datetime.getUTCDate(), 19);
+        Test.assertEqual(record.f_datetime.getUTCHours(), 10);
+        Test.assertEqual(record.f_datetime.getUTCMinutes(), 34);
+        Test.assertEqual(record.f_datetime.getUTCSeconds(), 22);
+        Test.assert(record.f_datetime2);
+        Test.assertEqual(record.f_datetime2.getUTCFullYear(), 2020);
+        Test.assertEqual(record.f_datetime2.getUTCMonth(), 1);
+        Test.assertEqual(record.f_datetime2.getUTCDate(), 18);
+        Test.assertEqual(record.f_datetime2.getUTCHours(), 9);
+        Test.assertEqual(record.f_datetime2.getUTCMinutes(), 33);
+        Test.assertEqual(record.f_datetime2.getUTCSeconds(), 21);
+        Test.assertEqual(record.f_datetime2.getUTCMilliseconds(), 987);
+        Test.assert(record.f_time);
+        Test.assertEqual(record.f_time.getUTCHours(), 7);
+        Test.assertEqual(record.f_time.getUTCMinutes(), 25);
+        Test.assertEqual(record.f_time.getUTCSeconds(), 46);
         Test.assert(record.f_char);
-        Test.assertEqual(record.f_char, 'XYZ');
+        Test.assertEqual(record.f_char, 'ABC');
         Test.assert(record.f_varchar);
-        Test.assertEqual(record.f_varchar, 'hello \0\b\t\n\r\Z\"\'\\ world');
-        Test.assert(record.f_blob);
-        Test.assertEqual(record.f_blob[0], 0x00);
-        Test.assertEqual(record.f_blob[1], 0x11);
-        Test.assertEqual(record.f_blob[2], 0x22);
-        Test.assertEqual(record.f_blob[3], 0x33);
-        Test.assertEqual(record.f_blob[4], 0x44);
-        Test.assertEqual(record.f_blob[5], 0x55);
-        Test.assertEqual(record.f_blob[6], 0x66);
-        Test.assertEqual(record.f_blob[7], 0x77);
-        Test.assertEqual(record.f_blob[8], 0x88);
-        Test.assertEqual(record.f_blob[9], 0x99);
-        Test.assertEqual(record.f_blob[10], 0xAA);
-        Test.assertEqual(record.f_blob[11], 0xBB);
-        Test.assertEqual(record.f_blob[12], 0xCC);
-        Test.assertEqual(record.f_blob[13], 0xDD);
-        Test.assertEqual(record.f_blob[14], 0xEE);
-        Test.assertEqual(record.f_blob[15], 0xFF);
-        Test.assert(record.f_text);
-        Test.assertEqual(record.f_text, 'testing \"MySQL\' text');
-        Test.assert(record.f_enum);
-        Test.assertEqual(record.f_enum, 'two');
-        Test.assert(record.f_json);
+        Test.assertEqual(record.f_varchar, 'hello\"\'\\world');
+        Test.assert(record.f_nchar);
+        Test.assertEqual(record.f_nchar.trim(), 'xyz');
+        Test.assert(record.f_nvarchar);
+        Test.assertEqual(record.f_nvarchar, 'testing unicode text');
+        Test.assert(record.f_varbinary);
+        Test.assertEqual(record.f_varbinary[0], 0x00);
+        Test.assertEqual(record.f_varbinary[1], 0x11);
+        Test.assertEqual(record.f_varbinary[2], 0x22);
+        Test.assertEqual(record.f_varbinary[3], 0x33);
+        Test.assertEqual(record.f_varbinary[4], 0x44);
+        Test.assertEqual(record.f_varbinary[5], 0x55);
+        Test.assertEqual(record.f_varbinary[6], 0x66);
+        Test.assertEqual(record.f_varbinary[7], 0x77);
+        Test.assertEqual(record.f_varbinary[8], 0x88);
+        Test.assertEqual(record.f_varbinary[9], 0x99);
+        Test.assertEqual(record.f_varbinary[10], 0xAA);
+        Test.assertEqual(record.f_varbinary[11], 0xBB);
+        Test.assertEqual(record.f_varbinary[12], 0xCC);
+        Test.assertEqual(record.f_varbinary[13], 0xDD);
+        Test.assertEqual(record.f_varbinary[14], 0xEE);
+        Test.assertEqual(record.f_varbinary[15], 0xFF);
+        Test.assert(record.f_uniqueidentifier);
+        Test.assertEqual(record.f_uniqueidentifier, 'A0EEBC99-9C0B-4EF8-BB6D-6BB9BD380A22');
 
-        const tJson = JSON.parse(record.f_json);
+        const tJson = JSON.parse(record.f_nvarchar_json);
         const tText = JSON.stringify(tJson);
 
         const fText = JSON.stringify(fObject);

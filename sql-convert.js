@@ -128,6 +128,16 @@ export class SqlConvert {
         'g');
 
     /**
+     * Microsoft SQL Server JSON regex. This is used to convert JSON into SQL strings.
+     */
+    static _msSqlServerJsonRegex = RegExp(
+        // Single quotation
+        '(?<singleQuotation>\')',
+        
+        // Global
+        'g');
+
+    /**
      * Convert the given value, which could be any type, into the SQL text value.
      * @param {*} value A value of an unknown type.
      * @param {SqlConfig} [sqlConfig] The SQL config settings to use.
@@ -434,6 +444,24 @@ export class SqlConvert {
 
             // Return the SQL text within an E and single quotation marks
             return 'E\'' + sql + '\'';
+        }
+
+        // If database is Microsoft SQL Server
+        if (sqlConfig.databaseType === DatabaseType.MS_SQL_SERVER) {
+            // Replace any problem characters in the string value to be used in SQL
+            const sql = json.replace(
+                SqlConvert._mySqlJsonRegex,
+                (
+                    fullMatch,
+                    singleQuotation) => {
+                    // Check match and return SQL response
+                    if (singleQuotation) return '\'\'';
+                    return fullMatch;
+                }
+            );
+
+            // Return the SQL text within a N (for unicode) and single quotation marks
+            return 'N\'' + sql + '\'';
         }
     }
 

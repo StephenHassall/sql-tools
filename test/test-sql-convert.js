@@ -344,6 +344,8 @@ export default class TestSqlConvert {
         mySqlConfig.databaseType = DatabaseType.MYSQL;
         const postgreSQLConfig = new SqlConfig();
         postgreSQLConfig.databaseType = DatabaseType.POSTGRESQL;
+        const msSqlServerConfig = new SqlConfig();
+        msSqlServerConfig.databaseType = DatabaseType.MS_SQL_SERVER;
 
         // Make object with toSql function
         const test = {};
@@ -369,10 +371,23 @@ export default class TestSqlConvert {
         sql = SqlConvert.valueToSql(sqlIdentifier, postgreSQLConfig);
         Test.assertEqual(sql, '"identifier-test"');
 
+        // Test Microsoft SQL Server SqlIdentifer
+        Test.describe('valueToSql Microsoft SQL Server SqlIdentifer');
+        sql = SqlConvert.valueToSql(sqlIdentifier, msSqlServerConfig);
+        Test.assertEqual(sql, '[identifier-test]');
+
+        try {
+            // Test invalid character
+            sql = SqlConvert.identifierToSql('error]character', msSqlServerConfig);
+            Test.assert();
+        } catch (e) {
+            Test.assertEqual(e.message, 'Invalid value. Contains "]" character');
+        }
+
         // Create SQL trusted
         const sqlTrusted = new SqlTrusted('trusted-test');
 
-        // Test MySQL SqlTrusted
+        // Test SqlTrusted
         Test.describe('valueToSql MySQL SqlTrusted');
         sql = SqlConvert.valueToSql(sqlTrusted);
         Test.assertEqual(sql, 'trusted-test');
@@ -390,6 +405,11 @@ export default class TestSqlConvert {
         sql = SqlConvert.valueToSql(sqlJson, postgreSQLConfig);
         Test.assertEqual(sql, 'E\'{"name":"hello\\\'world","age":50}\'');
 
+        // Test Microsoft SQL Server SqlJson
+        Test.describe('valueToSql Microsoft SQL Server SqlJson');
+        sql = SqlConvert.valueToSql(sqlJson, msSqlServerConfig);
+        Test.assertEqual(sql, 'N\'{"name":"hello\'\'world","age":50}\'');
+
         // Create SQL JSON with escape characters
         sqlJson = new SqlJson({ name: 'hello \b\t\r\n\"\'\\ world', age: 50 });
 
@@ -405,5 +425,13 @@ export default class TestSqlConvert {
         Test.describe('valueToSql PostgresSQL SqlJson escape characters');
         sql = SqlConvert.valueToSql(sqlJson, postgreSQLConfig);
         Test.assertEqual(sql, 'E\'{"name":"hello \\\\b\\\\f\\\\r\\\\n\\\\t\\\\"\\\'\\\\\\\\ world","age":50}\'');
+
+        // Create SQL JSON with escape characters
+        sqlJson = new SqlJson({ name: 'hello \"\'\\ world', age: 50 });
+
+        // Test Microsoft SQL Server SqlJson escape characters
+        Test.describe('valueToSql Microsoft SQL Server SqlJson escape characters');
+        sql = SqlConvert.valueToSql(sqlJson, msSqlServerConfig);
+        Test.assertEqual(sql, 'N\'{"name":"hello \\\"\'\'\\\\ world","age":50}\'');
     }
 }
