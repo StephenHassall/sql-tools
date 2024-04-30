@@ -19,14 +19,16 @@ export default class TestOracle {
         // Set SqlConfig for Oracle database
         TestOracle._sqlConfig = new SqlConfig();
         TestOracle._sqlConfig.databaseType = DatabaseType.ORACLE;
+        TestOracle._sqlConfig.removeComments = true;
+        TestOracle._sqlConfig.singleLine = true;
 
         // Initialize the database connection
         Database.initialize();
 
         // Perform tests
-        await TestOracle.testCreateTable();
-        //await TestMySql.testInsertSampleRecord();
-        //await TestMySql.testInsertRecordWithValues();
+        //await TestOracle.testCreateTable();
+        await TestOracle.testInsertSampleRecord();
+        //await TestOracle.testInsertRecordWithValues();
     }
 
     /**
@@ -57,7 +59,7 @@ export default class TestOracle {
         Test.describe('testInsertSampleRecord');
 
         // Create create table SQL command
-        let sqlTemplate = await SqlTemplateFile.getTemplate('./insert-sample.sql', import.meta.url, TestMySql._sqlConfig);
+        let sqlTemplate = await SqlTemplateFile.getTemplate('./insert-sample.sql', import.meta.url, TestOracle._sqlConfig);
         Test.assert(sqlTemplate);
 
         // Format the SQL template (without any values)
@@ -69,7 +71,7 @@ export default class TestOracle {
         Test.assert(result);
 
         // Create select SQL command
-        let sqlSelectTemplate = await SqlTemplateFile.getTemplate('./select.sql', import.meta.url, TestMySql._sqlConfig);
+        let sqlSelectTemplate = await SqlTemplateFile.getTemplate('./select.sql', import.meta.url, TestOracle._sqlConfig);
         Test.assert(sqlSelectTemplate);
 
         // Format the select SQL template (without any values)
@@ -80,61 +82,87 @@ export default class TestOracle {
         result = await Database.query(selectSql);
         Test.assert(result);
         Test.assertEqual(result.length, 1);
+        Test.assert(result[0].rows);
+        Test.assert(result[0].rows.length);
 
         // Set first (and only) record
-        const record = result[0];
+        const record = result[0].rows[0];
         Test.assert(record.f_bool);
         Test.assertEqual(record.f_bool, 1);
-        Test.assert(record.f_int);
-        Test.assertEqual(record.f_int, 123);
-        Test.assert(record.f_decimal);
-        Test.assertEqual(record.f_decimal, 12.3456);
-        Test.assert(record.f_date);
-        Test.assertEqual(record.f_date, '2024-04-19');
-        Test.assert(record.f_time);
-        Test.assertEqual(record.f_time, '12:34:56');
-        Test.assert(record.f_datetime);
-        Test.assertEqual(record.f_datetime, '2024-04-20 12:34:56');
-        Test.assert(record.f_datetime_millisecond);
-        Test.assertEqual(record.f_datetime_millisecond, '2024-04-20 12:34:56.123');
-        Test.assert(record.f_timestamp);
-        Test.assertEqual(record.f_timestamp, '2024-04-26 11:22:33');
-        Test.assert(record.f_year);
-        Test.assertEqual(record.f_year, 2024);
         Test.assert(record.f_char);
         Test.assertEqual(record.f_char, 'abc');
-        Test.assert(record.f_varchar);
-        Test.assertEqual(record.f_varchar, 'this is a string with escape codes \0\b\t\n\r\x1a\"\'\\');
-        Test.assert(record.f_blob);
-        Test.assertEqual(record.f_blob[0], 0xF0);
-        Test.assertEqual(record.f_blob[1], 0xE1);
-        Test.assertEqual(record.f_blob[2], 0xD2);
-        Test.assertEqual(record.f_blob[3], 0xC3);
-        Test.assertEqual(record.f_blob[4], 0xB4);
-        Test.assertEqual(record.f_blob[5], 0xA5);
-        Test.assertEqual(record.f_blob[6], 0x96);
-        Test.assertEqual(record.f_blob[7], 0x87);
-        Test.assertEqual(record.f_blob[8], 0x78);
-        Test.assertEqual(record.f_blob[9], 0x69);
-        Test.assertEqual(record.f_blob[10], 0x5A);
-        Test.assertEqual(record.f_blob[11], 0x4B);
-        Test.assertEqual(record.f_blob[12], 0x3C);
-        Test.assertEqual(record.f_blob[13], 0x2D);
-        Test.assertEqual(record.f_blob[14], 0x1E);
-        Test.assertEqual(record.f_blob[15], 0x0F);
-        Test.assert(record.f_text);
-        Test.assertEqual(record.f_text, 'this is more text with\"double quotes\" and \'single quotes\'.');
-        Test.assert(record.f_enum);
-        Test.assertEqual(record.f_enum, 'one');
-        Test.assert(record.f_json);
+        Test.assert(record.f_nchar);
+        Test.assertEqual(record.f_nchar, 'XYZ');
+        Test.assert(record.f_varchar2);
+        Test.assertEqual(record.f_varchar2, 'this is a string with escape codes \"\'\\\n\r\t\b\f\l\g\a');
+        Test.assert(record.f_nvarchar2);
+        Test.assertEqual(record.f_nvarchar2, 'this is more text with\"double quotes\" and \'single quotes\'.');
+        Test.assert(record.f_number);
+        Test.assertEqual(record.f_number, 12.3456);
+        Test.assert(record.f_float);
+        Test.assertEqual(record.f_float, 3.142);
+        Test.assert(record.f_datetime);
+        Test.assertEqual(record.f_datetime, '2024-04-20 12:34:56');
+        Test.assert(record.f_binary_float);
+        Test.assertEqual(record.f_binary_float, 2.718);
+        Test.assert(record.f_binary_double);
+        Test.assertEqual(record.f_binary_double, 1.234);
+        Test.assert(record.f_timestamp);
+        Test.assertEqual(record.f_timestamp, '2024-04-20 12:34:56.123');
+        Test.assert(record.f_raw);
+        Test.assertEqual(record.f_raw[0], 0xF0);
+        Test.assertEqual(record.f_raw[1], 0xE1);
+        Test.assertEqual(record.f_raw[2], 0xD2);
+        Test.assertEqual(record.f_raw[3], 0xC3);
+        Test.assertEqual(record.f_raw[4], 0xB4);
+        Test.assertEqual(record.f_raw[5], 0xA5);
+        Test.assertEqual(record.f_raw[6], 0x96);
+        Test.assertEqual(record.f_raw[7], 0x87);
+        Test.assertEqual(record.f_raw[8], 0x78);
+        Test.assertEqual(record.f_raw[9], 0x69);
+        Test.assertEqual(record.f_raw[10], 0x5A);
+        Test.assertEqual(record.f_raw[11], 0x4B);
+        Test.assertEqual(record.f_raw[12], 0x3C);
+        Test.assertEqual(record.f_raw[13], 0x2D);
+        Test.assertEqual(record.f_raw[14], 0x1E);
+        Test.assertEqual(record.f_raw[15], 0x0F);
+        Test.assert(record.f_long_raw);
+        Test.assertEqual(record.f_long_raw[0], 0x00);
+        Test.assertEqual(record.f_long_raw[1], 0x11);
+        Test.assertEqual(record.f_long_raw[2], 0x22);
+        Test.assertEqual(record.f_long_raw[3], 0x33);
+        Test.assertEqual(record.f_long_raw[4], 0x44);
+        Test.assertEqual(record.f_long_raw[5], 0x55);
+        Test.assertEqual(record.f_long_raw[6], 0x66);
+        Test.assertEqual(record.f_long_raw[7], 0x77);
+        Test.assertEqual(record.f_long_raw[8], 0x88);
+        Test.assertEqual(record.f_long_raw[9], 0x99);
+        Test.assertEqual(record.f_long_raw[10], 0xAA);
+        Test.assertEqual(record.f_long_raw[11], 0xBB);
+        Test.assertEqual(record.f_long_raw[12], 0xCC);
+        Test.assertEqual(record.f_long_raw[13], 0xDD);
+        Test.assertEqual(record.f_long_raw[14], 0xEE);
+        Test.assertEqual(record.f_long_raw[15], 0xFF);
+
+        Test.assert(record.f_clob);
 
         const tJson = { property1: 123, property2: "te\"s\\t", property3: "te\'st" };
         const tText = JSON.stringify(tJson);
 
-        const fJson = JSON.parse(record.f_json);
+        const fJson = JSON.parse(record.f_clob);
         const fText = JSON.stringify(fJson);
 
         Test.assertEqual(fText, tText);
+
+        Test.assert(record.f_blob);
+        Test.assertEqual(record.f_blob[0], 0x01);
+        Test.assertEqual(record.f_blob[1], 0x23);
+        Test.assertEqual(record.f_blob[2], 0x45);
+        Test.assertEqual(record.f_blob[3], 0x67);
+        Test.assertEqual(record.f_blob[4], 0x89);
+        Test.assertEqual(record.f_blob[5], 0xAB);
+        Test.assertEqual(record.f_blob[6], 0xCD);
+        Test.assertEqual(record.f_blob[7], 0xEF);
     }
 
     /**

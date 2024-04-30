@@ -25,47 +25,77 @@ export default class Database {
 
     /**
      * Run a query on the database.
+     * 
+     * We need to do the following.
+     *   connection = getConnection(...);
+     *   result = connection.execute(one command at once, no ; character on the end)
+     *   connection.commit()
+     *   connecion.close()
+     *   
      * @param sql The SQL query to run.
      * @return {Promise} A promise resolving the data.
      */
-    static query(sql) {
-        // Create promise
-        const promise = new Promise((resolve, reject) => {
-            // Make a connection to the database
-            OracleDb.getConnection(Database._connectConfig, function (error, connection) {
-                // If error
-                if (error) {
-                    // Reject the promise with the error
-                    reject(error);
-                    
-                    // Stop here
-                    return;
+    static async query(sql) {
+        // Create result list
+        const resultList = [];
+
+        // Split the SQL into an execute SQL list
+        const executeSqlList = sql.split(';');
+
+        // Set connection
+        let connection = null;
+
+        // Set execute SQL
+        let executeSql = '';
+
+        // Set select options
+        const options = { outFormat: OracleDb.OUT_FORMAT_OBJECT };
+
+        try {
+            // Make connection
+            connection = await OracleDb.getConnection(Database._connectConfig);
+
+            // For each execute SQL to run
+            for (let index = 0; index < executeSqlList.length; index++) {
+                // Get execute SQL
+                executeSql = executeSqlList[index];
+
+                // Trim
+                executeSql = executeSql.trim();
+
+                // If empty then skip
+                if (executeSql.length === 0) continue;
+
+                // If select command
+                if (executeSql.toLowerCase().startsWith('select') === true) {
+                    // Execute the SQL
+                    const result = await connection.execute(executeSql, [], options);
+
+                    // Add result to the list
+                    resultList.push(result);
+                } else {
+                    // Execute the SQL
+                    await connection.execute(executeSql);
                 }
+            };
 
-                // Execute SQL statement
-                connection.execute(sql, function (error, results) {
-                    // If error
-                    if (error) {
-                        // Close connection
-                        connection.close();
+            // Commit the changes
+            await connection.commit();
+        } catch (error) {
+            // Log sql that created the error
+            console.error(executeSql);
 
-                        // Reject the promise with the error
-                        reject(error);
+            // Log the error
+            console.error(error);
+        } finally {
+            // If the connection exists
+            if (connection !== null) {
+                // Close the connection
+                await connection.close();
+            }
 
-                        // Stop here
-                        return;
-                    }
-
-                    // Resolve promise with the results
-                    resolve(results);
-
-                    // Close connection
-                    connection.close();
-                });
-            });
-        });
-
-        // Return the promise
-        return promise;
+            // Return the result list
+            return resultList;
+        }
     }
 }

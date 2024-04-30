@@ -15,12 +15,13 @@ export default class TestSqlTemplate {
         Test.test('SqlTemplate');
 
         // Perform tests
-        //await TestSqlTemplate.testCreateBlockList();
-        //await TestSqlTemplate.testCreateBlockTree();
-        //await TestSqlTemplate.testCheckBlockTreeError();
-        //await TestSqlTemplate.testProcessBlockTree();
-        //TestSqlTemplate.testProcessSqlValues();
+        await TestSqlTemplate.testCreateBlockList();
+        await TestSqlTemplate.testCreateBlockTree();
+        await TestSqlTemplate.testCheckBlockTreeError();
+        await TestSqlTemplate.testProcessBlockTree();
+        TestSqlTemplate.testProcessSqlValues();
         TestSqlTemplate.testRemoveComments();
+        TestSqlTemplate.testMakeSingleLine();
     }
 
     /**
@@ -491,7 +492,7 @@ export default class TestSqlTemplate {
         Test.assertEqual(sql, '');
         sql = sqlTemplate._removeComments('--nothing\n');
         Test.assertEqual(sql, '');
-        sql = sqlTemplate._removeComments('--nothing\n\r');
+        sql = sqlTemplate._removeComments('--nothing\r\n');
         Test.assertEqual(sql, '');
         sql = sqlTemplate._removeComments('--nothing\r');
         Test.assertEqual(sql, '');
@@ -502,7 +503,7 @@ export default class TestSqlTemplate {
         Test.assertEqual(sql, 'hello');
         sql = sqlTemplate._removeComments('--nothing\nhello');
         Test.assertEqual(sql, 'hello');
-        sql = sqlTemplate._removeComments('--nothing\n\rhello');
+        sql = sqlTemplate._removeComments('--nothing\r\nhello');
         Test.assertEqual(sql, 'hello');
         sql = sqlTemplate._removeComments('--nothing\rhello');
         Test.assertEqual(sql, 'hello');
@@ -513,7 +514,7 @@ export default class TestSqlTemplate {
         Test.assertEqual(sql, 'hello\n');
         sql = sqlTemplate._removeComments('hello\n--nothing\n');
         Test.assertEqual(sql, 'hello\n');
-        sql = sqlTemplate._removeComments('hello\n--nothing\n\r');
+        sql = sqlTemplate._removeComments('hello\n--nothing\r\n');
         Test.assertEqual(sql, 'hello\n');
         sql = sqlTemplate._removeComments('hello\n--nothing\r');
         Test.assertEqual(sql, 'hello\n');
@@ -524,12 +525,53 @@ export default class TestSqlTemplate {
         Test.assertEqual(sql, '');
         sql = sqlTemplate._removeComments('#nothing\n');
         Test.assertEqual(sql, '');
-        sql = sqlTemplate._removeComments('#nothing\n\r');
+        sql = sqlTemplate._removeComments('#nothing\r\n');
         Test.assertEqual(sql, '');
         sql = sqlTemplate._removeComments('#nothing\r');
         Test.assertEqual(sql, '');
 
         sql = sqlTemplate._removeComments('line 1\n/*line 2\n*/line 3\n--line 4\nline 5\n#line 6\nline 7');
-        Test.assertEqual(sql, 'line \nline 3\nline 5\nline 7');
+        Test.assertEqual(sql, 'line 1\nline 3\nline 5\nline 7');
+    }
+
+    /**
+     * Test the make single line.
+     */
+    static testMakeSingleLine() {
+        // Create Sql template
+        let sqlTemplate = new SqlTemplate('true');
+
+        // Test single line
+        Test.describe('makeSingleLine single line');
+        let sql = sqlTemplate._makeSingleLine('');
+        Test.assertEqual(sql, '');
+        sql = sqlTemplate._makeSingleLine('hello world');
+        Test.assertEqual(sql, 'hello world');
+
+        // Test multiple lines
+        Test.describe('makeSingleLine multiple lines');
+        sql = sqlTemplate._makeSingleLine('hello\r\nworld');
+        Test.assertEqual(sql, 'hello world');
+        sql = sqlTemplate._makeSingleLine('hello\rworld');
+        Test.assertEqual(sql, 'hello world');
+        sql = sqlTemplate._makeSingleLine('hello\nworld');
+        Test.assertEqual(sql, 'hello world');
+
+        sql = sqlTemplate._makeSingleLine('hello\r\nworld\r123\ntest');
+        Test.assertEqual(sql, 'hello world 123 test');
+
+        sql = sqlTemplate._makeSingleLine('hello world\r\n');
+        Test.assertEqual(sql, 'hello world');
+        sql = sqlTemplate._makeSingleLine('hello world\r');
+        Test.assertEqual(sql, 'hello world');
+        sql = sqlTemplate._makeSingleLine('hello world\n');
+        Test.assertEqual(sql, 'hello world');
+
+        sql = sqlTemplate._makeSingleLine('\r\nhello world');
+        Test.assertEqual(sql, 'hello world');
+        sql = sqlTemplate._makeSingleLine('\rhello world');
+        Test.assertEqual(sql, 'hello world');
+        sql = sqlTemplate._makeSingleLine('\nhello world');
+        Test.assertEqual(sql, 'hello world');
     }
 }

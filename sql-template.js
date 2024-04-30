@@ -38,12 +38,30 @@ export class SqlTemplate {
     static _commentRegex = RegExp(
         // Comment block /*....*/
         // \/\* = starts with /*
-        // [\s\S][^*][^\/]* = any white space and non white space character, but no /*
+        // ([\\s\\S](?!\\/\\*))* = any white space and non white space character, but no "/*"
         // *\*\/ = ends with */
-        '(?<commentBlock>\\/\\*[\\s\\S][^*][^\\/]*\\*\\/)|' +
-
+        '(\\/\\*([\\s\\S](?!\\/\\*))*\\*\\/)|' +
+        
         // Comment line
-        '(?<commentLine>[#|\\--].*$|\\r|\\n)',
+        // #, \\-\\- = starts with # or --
+        // .* = any characters
+        // \\r\\n, $, [\r|\n] = ends with either the "CRLF" characters together, or the end of the string, or CR or LF
+        '(#.*\\r\\n)|' +
+        '(#.*$)|' +
+        '(#.*[\\r|\\n])|' +
+        '(\\-\\-.*\\r\\n)|' +
+        '(\\-\\-.*$)|' +
+        '(\\-\\-.*[\\r|\\n])',
+
+        // Global
+        'g');
+
+    /**
+     * Single line regex. This is used to look for new lines in the SQL.
+     */
+    static _singleLineRegex = RegExp(
+        // New line characters
+        '(\\r\\n)|([\\r|\\n])',
 
         // Global
         'g');
@@ -62,6 +80,9 @@ export class SqlTemplate {
 
         // Set SQL config
         this._sqlConfig = sqlConfig;
+
+        // If SQL config is not set then use the default one
+        if (!this._sqlConfig) this._sqlConfig = SqlConfig.default;
 
         // Set template
         this._template = template;
@@ -93,6 +114,18 @@ export class SqlTemplate {
 
         // Process values
         sql = this._processSqlValues(sql);
+
+        // If remove comments or single line
+        if (this._sqlConfig.removeComments === true || this._sqlConfig._singleLine === true) {
+            // Remove the comments
+            sql = this._removeComments(sql);
+        }
+
+        // If single line
+        if (this._sqlConfig._singleLine === true) {
+            // Make single line
+            sql = this._makeSingleLine(sql);
+        }
 
         // Return the final SQL
         return sql;
@@ -670,17 +703,7 @@ export class SqlTemplate {
      */
     _removeComments(sql) {
         // Remove the comments from the SQL
-        const processedSql = sql.replace(
-            SqlTemplate._commentRegex,
-            (
-                fullMatch,
-                commentBlock,
-                commentLine) => {
-                // Do not replace the comments with anything
-                if (fullMatch) return fullMatch;
-                return '';
-            }
-        );
+        const processedSql = sql.replace(SqlTemplate._commentRegex, () => { return ''; });
 
         // Return the processed SQL
         return processedSql;
@@ -692,6 +715,13 @@ export class SqlTemplate {
      * @return {String} The SQL text all on one line.
      */
     _makeSingleLine(sql) {
-        
+        // Replace any new line characters with spaces
+        let processedSql = sql.replace(SqlTemplate._singleLineRegex, () => { return ' '; });
+
+        // Trim and starting or ending white space
+        processedSql = processedSql.trim();
+
+        // Return the processed SQL
+        return processedSql;
     }
 }

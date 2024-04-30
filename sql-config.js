@@ -50,6 +50,8 @@ export class SqlConfig {
         // Set defaults
         this._databaseType = DatabaseType.MYSQL;
         this._utc = true;
+        this._removeComments = true;
+        this._singleLine = false;
     }
 
     /**
@@ -86,5 +88,41 @@ export class SqlConfig {
     set utc(value) {
         // Set UTC value
         this._utc = value;
+    }
+
+    /**
+     * Get the remove comments setting.
+     * @return {Boolean} The remove comments setting.
+     */
+    get removeComments() {
+        // Return the remove comments setting
+        return this._removeComments;
+    }
+
+    /**
+     * Sets the remove comments setting. Should all the --comments be removed when formatting.
+     * @param {Boolean} value The remove comments setting.
+     */
+    set removeComments(value) {
+        // Set remove comments value
+        this._removeComments = value;
+    }
+
+    /**
+     * Get the single line setting.
+     * @return {Boolean} The single line setting.
+     */
+    get singleLine() {
+        // Return the single line setting
+        return this._singleLine;
+    }
+
+    /**
+     * Sets the single line setting. Should all new line characters be replaced with spaces when formatting.
+     * @param {Boolean} value The single line setting.
+     */
+    set singleLine(value) {
+        // Set single line value
+        this._singleLine = value;
     }
 }
