@@ -53,7 +53,7 @@ export default class TestSqlTemplateCondition {
         // Test database type
         Test.describe('getNextToken database type');
         condition = new SqlTemplateCondition('true');
-        condition._condition = ' MYSQL POSTGRESQL MS_SQL_SERVER  ';
+        condition._condition = ' MYSQL POSTGRESQL MS_SQL_SERVER ORACLE ';
         condition._tokenIndex = 0;
         token = condition._getNextToken();
         Test.assert(token);
@@ -67,6 +67,10 @@ export default class TestSqlTemplateCondition {
         Test.assert(token);
         Test.assertEqual(token.tokenType, TokenType.DATABASE_TYPE);
         Test.assertEqual(token.value, DatabaseType.MS_SQL_SERVER);
+        token = condition._getNextToken();
+        Test.assert(token);
+        Test.assertEqual(token.tokenType, TokenType.DATABASE_TYPE);
+        Test.assertEqual(token.value, DatabaseType.ORACLE);
 
         // Test strings
         Test.describe('getNextToken strings');

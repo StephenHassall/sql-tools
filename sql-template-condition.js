@@ -15,7 +15,8 @@ export class SqlTemplateCondition {
     static _databaseTypeList = [
         { text: 'MYSQL', type: DatabaseType.MYSQL },
         { text: 'POSTGRESQL', type: DatabaseType.POSTGRESQL },
-        { text: 'MS_SQL_SERVER', type: DatabaseType.MS_SQL_SERVER }
+        { text: 'MS_SQL_SERVER', type: DatabaseType.MS_SQL_SERVER },
+        { text: 'ORACLE', type: DatabaseType.ORACLE }
     ];
 
     /**
@@ -679,6 +680,30 @@ export class SqlTemplateCondition {
                 if (character === '=' && character2 === '=' && character3 === '=') { tokenType = TokenType.COMPARE_EQUAL; this._tokenIndex += 2; break; }
                 if (character === '!' && character2 === '=' && character3 === '=') { tokenType = TokenType.COMPARE_NOT_EQUAL; this._tokenIndex += 2; break; }
                 
+                // Check database type
+                for (let index = 0; index < SqlTemplateCondition._databaseTypeList.length; index++) {
+                    // Get database type information
+                    const databaseTypeInfo = SqlTemplateCondition._databaseTypeList[index];
+
+                    // Check database type
+                    if (this._condition.startsWith(databaseTypeInfo.text, this._tokenIndex - 1) === false) continue;
+                    
+                    // Set token type
+                    tokenType = TokenType.DATABASE_TYPE;
+
+                    // Set database type
+                    databaseType = databaseTypeInfo.type;
+
+                    // Increase the token index
+                    this._tokenIndex += databaseTypeInfo.text.length - 1;
+
+                    // Stop looking
+                    break;
+                }
+
+                // If database type was found then process it
+                if (tokenType === TokenType.DATABASE_TYPE) break;
+
                 // Check AND
                 if ((character === 'a' || character === 'A') && 
                     (character2 === 'n' || character2 === 'N') &&
@@ -750,30 +775,6 @@ export class SqlTemplateCondition {
                         }
                     }
                 }
-
-                // Check database type
-                for (let index = 0; index < SqlTemplateCondition._databaseTypeList.length; index++) {
-                    // Get database type information
-                    const databaseTypeInfo = SqlTemplateCondition._databaseTypeList[index];
-
-                    // Check database type
-                    if (this._condition.startsWith(databaseTypeInfo.text, this._tokenIndex - 1) === false) continue;
-                    
-                    // Set token type
-                    tokenType = TokenType.DATABASE_TYPE;
-
-                    // Set database type
-                    databaseType = databaseTypeInfo.type;
-
-                    // Increase the token index
-                    this._tokenIndex += databaseTypeInfo.text.length - 1;
-
-                    // Stop looking
-                    break;
-                }
-
-                // If database type was found then process it
-                if (tokenType === TokenType.DATABASE_TYPE) break;
 
                 // If we got here then there must be an error
                 throw new Error('Syntax error. Unknown token starting at: ' + this._condition.substring(this._tokenIndex - 1));

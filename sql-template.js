@@ -61,7 +61,7 @@ export class SqlTemplate {
      */
     static _singleLineRegex = RegExp(
         // New line characters
-        '(\\r\\n)|([\\r|\\n])',
+        '(\\r\\n)|([\\r])|([\\n])',
 
         // Global
         'g');
@@ -103,9 +103,10 @@ export class SqlTemplate {
     /**
      * Format the template using the given values.
      * @param {Object} values An object that contains all the values that will be used within the template.
+     * @param {SqlConfig} [sqlConfig] The SQL config settings to use.
      * @return {String} The formatted template. Use this final SQL command with the database.
      */
-    format(values) {
+    format(values, sqlConfig) {
         // Set values
         this._values = values;
 
@@ -114,6 +115,9 @@ export class SqlTemplate {
 
         // Process values
         sql = this._processSqlValues(sql);
+
+        // If no SQL config the set the one it was created with
+        if (!sqlConfig) sqlConfig = this._sqlConfig;
 
         // If remove comments or single line
         if (this._sqlConfig.removeComments === true || this._sqlConfig._singleLine === true) {
@@ -716,7 +720,10 @@ export class SqlTemplate {
      */
     _makeSingleLine(sql) {
         // Replace any new line characters with spaces
-        let processedSql = sql.replace(SqlTemplate._singleLineRegex, () => { return ' '; });
+        let processedSql = sql.replace(SqlTemplate._singleLineRegex, (t) => 
+        { 
+            return ' '; 
+        });
 
         // Trim and starting or ending white space
         processedSql = processedSql.trim();

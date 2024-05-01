@@ -3,6 +3,7 @@
  */
 import { BlockType } from "../block.js";
 import { readFile } from "node:fs/promises";
+import { SqlConfig, DatabaseType } from "../sql-config.js";
 import { SqlTemplate } from "../sql-template.js";
 import Test from "./test.js";
 
@@ -412,6 +413,27 @@ export default class TestSqlTemplate {
         sqlTemplate = new SqlTemplate(template);
         sql = sqlTemplate.format(values);
         Test.assertEqual(sql, 'block1\r\nblock2\r\nblock4\r\nblock5\r\nblock10');
+
+        // Create config
+        const sqlConfig = new SqlConfig();
+        sqlConfig.databaseType = DatabaseType.MYSQL;
+
+        // Test process block tree 7 (database type)
+        Test.describe('processBlockTree processBlockTree7.sql');
+        template = await readFile('./test/sql/processBlockTree7.sql', { encoding: 'utf8' });
+        Test.assert(template);
+        sqlTemplate = new SqlTemplate(template, sqlConfig);
+        sql = sqlTemplate.format(values);
+        Test.assertEqual(sql, 'block1\r\nblock2\r\nblock6');
+        sqlConfig.databaseType = DatabaseType.POSTGRESQL;
+        sql = sqlTemplate.format(values);
+        Test.assertEqual(sql, 'block1\r\nblock3\r\nblock6');
+        sqlConfig.databaseType = DatabaseType.MS_SQL_SERVER;
+        sql = sqlTemplate.format(values);
+        Test.assertEqual(sql, 'block1\r\nblock4\r\nblock6');
+        sqlConfig.databaseType = DatabaseType.ORACLE;
+        sql = sqlTemplate.format(values);
+        Test.assertEqual(sql, 'block1\r\nblock5\r\nblock6');
     }
 
     /**
@@ -573,5 +595,8 @@ export default class TestSqlTemplate {
         Test.assertEqual(sql, 'hello world');
         sql = sqlTemplate._makeSingleLine('\nhello world');
         Test.assertEqual(sql, 'hello world');
+
+        sql = sqlTemplate._makeSingleLine('hello || world');
+        Test.assertEqual(sql, 'hello || world');
     }
 }

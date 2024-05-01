@@ -21,6 +21,12 @@ export default class Database {
             password: Process.env.ORACLE_PASSWORD,
             connectionString: Process.env.ORACLE_CONNECTION_STRING
         };
+
+        // Set to fetch all CLOB data as strings
+        OracleDb.fetchAsString = [ OracleDb.CLOB ];
+
+        // Set to fetch all BLOB data as buffer
+        OracleDb.fetchAsBuffer = [ OracleDb.BLOB ];
     }
 
     /**

@@ -82,6 +82,22 @@ export class SqlConvert {
         'g');
 
     /**
+     * Oracle string regex. This is used to convert strings into SQL strings.
+     */
+    static _oracleStringRegex = RegExp(
+        // Single quotation
+        '(?<singleQuotation>\')|' +
+
+        // New line
+        '(?<newline>\n)|' +
+
+        // Carriage return
+        '(?<carriageReturn>\r)', 
+
+        // Global
+        'g');
+
+    /**
      * MySQL identifier regex. This is used to convert identifiers into SQL strings.
      */
     static _mySqlIdentifierRegex = RegExp(
@@ -131,6 +147,16 @@ export class SqlConvert {
      * Microsoft SQL Server JSON regex. This is used to convert JSON into SQL strings.
      */
     static _msSqlServerJsonRegex = RegExp(
+        // Single quotation
+        '(?<singleQuotation>\')',
+        
+        // Global
+        'g');
+
+    /**
+     * Oracle JSON regex. This is used to convert JSON into SQL strings.
+     */
+    static _oracleJsonRegex = RegExp(
         // Single quotation
         '(?<singleQuotation>\')',
         
@@ -198,6 +224,13 @@ export class SqlConvert {
             if (value === false) return '0';
         }
 
+        // If database is Oracle
+        if (sqlConfig.databaseType === DatabaseType.ORACLE) {
+            // Check value and return resut
+            if (value === true) return '1';
+            if (value === false) return '0';
+        }
+
         // If true then return TRUE
         if (value === true) return 'TRUE';
 
@@ -223,6 +256,15 @@ export class SqlConvert {
 
         // Convert the date into SQL text
         const sqlDateText = SqlConvert._convertDateToSql(date, sqlConfig);
+
+        // If database is Oracle
+        if (sqlConfig.databaseType === DatabaseType.ORACLE) {
+            // Only include the date part, suround with single quotation marks and prefix with DATE keyword, 
+            const sqlText = 'DATE ' + '\'' + sqlDateText.substring(0, 10) + '\'';
+
+            // Return formatted SQL date time
+            return sqlText;
+        }
 
         // Add single quotation marks
         const sqlText ='\'' + sqlDateText + '\'';
@@ -262,6 +304,12 @@ export class SqlConvert {
 
         // If database is Microsoft SQL Server
         if (sqlConfig.databaseType === DatabaseType.MS_SQL_SERVER) {
+            // Return the SQL text within an N and single quotation marks
+            return 'N\'' + sql + '\'';
+        }
+
+        // If database is Oracle
+        if (sqlConfig.databaseType === DatabaseType.ORACLE) {
             // Return the SQL text within an N and single quotation marks
             return 'N\'' + sql + '\'';
         }
@@ -324,6 +372,15 @@ export class SqlConvert {
             // Return the value as it is with [...] square brackets
             return '[' + value + ']';
         }
+
+        // If database is Oracle
+        if (sqlConfig.databaseType === DatabaseType.ORACLE) {
+            // Check for the " character
+            if (value.indexOf('"') !== -1) throw new Error('Invalid value. Contains " character');
+
+            // Return the value as it is with "..." double quotation marks
+            return '"' + value + '"';
+        }
     }
 
     /**
@@ -355,6 +412,12 @@ export class SqlConvert {
         if (sqlConfig.databaseType === DatabaseType.MS_SQL_SERVER) {
             // Return the hexadecimal SQL text
             return '0x' + buffer.toString('hex');
+        }
+
+        // If database is Oracle
+        if (sqlConfig.databaseType === DatabaseType.ORACLE) {
+            // Return the hexadecimal SQL text
+            return 'HEXTORAW(\'' + buffer.toString('hex') + '\')';
         }
     }
 
@@ -388,6 +451,12 @@ export class SqlConvert {
 
         // If database is Microsoft SQL Server
         if (sqlConfig.databaseType === DatabaseType.MS_SQL_SERVER) {
+            // Return the SQL text within an N and single quotation marks
+            return 'N\'' + sql + '\'';
+        }
+
+        // If database is Oracle
+        if (sqlConfig.databaseType === DatabaseType.ORACLE) {
             // Return the SQL text within an N and single quotation marks
             return 'N\'' + sql + '\'';
         }
@@ -451,6 +520,24 @@ export class SqlConvert {
             // Replace any problem characters in the string value to be used in SQL
             const sql = json.replace(
                 SqlConvert._mySqlJsonRegex,
+                (
+                    fullMatch,
+                    singleQuotation) => {
+                    // Check match and return SQL response
+                    if (singleQuotation) return '\'\'';
+                    return fullMatch;
+                }
+            );
+
+            // Return the SQL text within a N (for unicode) and single quotation marks
+            return 'N\'' + sql + '\'';
+        }
+
+        // If database is Oracle
+        if (sqlConfig.databaseType === DatabaseType.ORACLE) {
+            // Replace any problem characters in the string value to be used in SQL
+            const sql = json.replace(
+                SqlConvert._oracleJsonRegex,
                 (
                     fullMatch,
                     singleQuotation) => {
@@ -548,6 +635,28 @@ export class SqlConvert {
                     singleQuotation) => {
                     // Check match and return SQL response
                     if (singleQuotation) return '\'\'';
+                    return fullMatch;
+                }
+            );
+
+            // Return the SQL text
+            return sql;
+        }
+
+        // If database is Oracle
+        if (sqlConfig.databaseType === DatabaseType.ORACLE) {
+            // Replace any problem characters in the string value to be used in SQL
+            const sql = value.replace(
+                SqlConvert._oracleStringRegex,
+                (
+                    fullMatch,
+                    singleQuotation,
+                    newline,
+                    carriageReturn) => {
+                    // Check match and return SQL response
+                    if (singleQuotation) return '\'\'';
+                    if (newline) return '\' || CHR(10) || \'';
+                    if (carriageReturn) return '\' || CHR(13) || \'';
                     return fullMatch;
                 }
             );
@@ -818,5 +927,88 @@ export class SqlNonUnicode {
 
         // Otherwise just return the string as is
         return sql;
+    }
+}
+
+/**
+ * SQL Timestamp.
+ * Used to add date and time parts to an Oracle TIMESTAMP column. A date
+ * object is converted into "DATE 'YYYY-MM-DD'" SQL text for Oracle, but
+ * when you want to convert it into a timestamp then use this.
+ */
+export class SqlTimestamp {
+    /**
+     * SQL Timestamp constructor.
+     * @param {Date} date The date that will be added to the SQL.
+     */
+    constructor(date) {
+        // Set date value
+        this._date = date;
+    }
+
+    /**
+     * Convert the date value into safe SQL string.
+     * @param {SqlConfig} [sqlConfig] The SQL config settings to use.
+     * @return {String} The date as safe SQL text.
+     */
+    toSql(sqlConfig) {
+        // If SQL config is not set then use the default one
+        if (!sqlConfig) sqlConfig = SqlConfig.default;
+
+        // Make sure the date is a date object
+        if (typeof this._date !== 'object' || !(this._date instanceof Date)) throw new Error('Invalid date');
+
+        // If the date is invalid then add NULL to list
+        if (isNaN(this._date.getTime()) === true) return 'NULL';
+
+        // Get date and time values
+        let year = 0;
+        let month = 0;
+        let day = 0;
+        let hour = 0;
+        let minute = 0;
+        let second = 0;
+        let millisecond = 0;
+
+        // If UTC
+        if (sqlConfig.utc === true) {
+            // Get UTC date and time values
+            year = this._date.getUTCFullYear();
+            month = this._date.getUTCMonth() + 1;
+            day = this._date.getUTCDate();
+            hour = this._date.getUTCHours();
+            minute = this._date.getUTCMinutes();
+            second = this._date.getUTCSeconds();
+            millisecond = this._date.getUTCMilliseconds();
+        } else {
+            // Get local date and time values
+            year = this._date.getFullYear();
+            month = this._date.getMonth() + 1;
+            day = this._date.getDate();
+            hour = this._date.getHours();
+            minute = this._date.getMinutes();
+            second = this._date.getSeconds();
+            millisecond = this._date.getMilliseconds();
+        }
+
+        // Format parts
+        const yearText = year.toString();
+        const monthText = month.toString().padStart(2, '0');
+        const dayText = day.toString().padStart(2, '0');
+        const hourText = hour.toString().padStart(2, '0');
+        const minuteText = minute.toString().padStart(2, '0');
+        const secondText = second.toString().padStart(2, '0');
+        const millisecondText = millisecond.toString().padStart(3, '0');
+
+        // Format SQL date time
+        const sqlText =
+            'TIMESTAMP \'' +
+            yearText + '-' + monthText + '-' + dayText + ' ' +
+            hourText + ':' + minuteText + ':' + secondText + '.' +
+            millisecondText +
+            '\'';
+        
+        // Return formatted SQL date time
+        return sqlText;
     }
 }

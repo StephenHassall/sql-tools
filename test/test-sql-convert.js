@@ -3,7 +3,7 @@
  */
 import { Buffer } from 'node:buffer';
 import { SqlConfig, DatabaseType } from "../sql-config.js";
-import { SqlConvert, SqlIdentifier, SqlTrusted, SqlJson } from "../sql-convert.js";
+import { SqlConvert, SqlIdentifier, SqlTrusted, SqlJson, SqlTimestamp } from "../sql-convert.js";
 import Test from "./test.js";
 
 export default class TestSqlConvert {
@@ -54,6 +54,10 @@ export default class TestSqlConvert {
         mySqlConfig.databaseType = DatabaseType.MYSQL;
         const postgreSQLConfig = new SqlConfig();
         postgreSQLConfig.databaseType = DatabaseType.POSTGRESQL;
+        const msSqlServerConfig = new SqlConfig();
+        msSqlServerConfig.databaseType = DatabaseType.MS_SQL_SERVER;
+        const oracleConfig = new SqlConfig();
+        oracleConfig.databaseType = DatabaseType.ORACLE;
 
         // Test text
         Test.describe('valueToSql text');
@@ -61,6 +65,10 @@ export default class TestSqlConvert {
         Test.assertEqual(sql, '\'hello world\'');
         sql = SqlConvert.valueToSql('hello world', postgreSQLConfig);
         Test.assertEqual(sql, 'E\'hello world\'');
+        sql = SqlConvert.valueToSql('hello world', msSqlServerConfig);
+        Test.assertEqual(sql, 'N\'hello world\'');
+        sql = SqlConvert.valueToSql('hello world', oracleConfig);
+        Test.assertEqual(sql, 'N\'hello world\'');
 
         // Test MySQL escape characters
         Test.describe('valueToSql MySQL escape characters');
@@ -71,6 +79,16 @@ export default class TestSqlConvert {
         Test.describe('valueToSql PostgreSQL escape characters');
         sql = SqlConvert.valueToSql('hello \b\f\r\n\t\"\'\\ world', postgreSQLConfig);
         Test.assertEqual(sql, 'E\'hello \\b\\f\\r\\n\\t\\"\\\'\\\\ world\'');
+
+        // Test Microsoft SLQ Server escape characters
+        Test.describe('valueToSql Microsoft SLQ Server escape characters');
+        sql = SqlConvert.valueToSql('hello \"\'\\\r\n\t world', msSqlServerConfig);
+        Test.assertEqual(sql, 'N\'hello \"\'\'\\\r\n\t world\'');
+
+        // Test Oracle escape characters
+        Test.describe('valueToSql Oracle escape characters');
+        sql = SqlConvert.valueToSql('hello \"\'\\\r\n\t world', oracleConfig);
+        Test.assertEqual(sql, 'N\'hello \"\'\'\\\' || CHR(13) || \'\' || CHR(10) || \'\t world\'');
 
         // Test MySQL identifier
         Test.describe('valueToSql MySQL identifier');
@@ -85,6 +103,28 @@ export default class TestSqlConvert {
         Test.assertEqual(sql, '"table"');
         sql = SqlConvert.identifierToSql('ta"ble', postgreSQLConfig);
         Test.assertEqual(sql, '"ta""ble"');
+
+        // Test Microsoft SQL Server identifier
+        Test.describe('valueToSql Microsoft SQL Server identifier');
+        sql = SqlConvert.identifierToSql('table', msSqlServerConfig);
+        Test.assertEqual(sql, '[table]');
+        try {
+            SqlConvert.identifierToSql('tab]le', msSqlServerConfig);
+            Test.assert();
+        } catch (e) {
+            Test.assertEqual(e.message, 'Invalid value. Contains "]" character');
+        }
+
+        // Test Oracle Server identifier
+        Test.describe('valueToSql Oracle identifier');
+        sql = SqlConvert.identifierToSql('table', oracleConfig);
+        Test.assertEqual(sql, '"table"');
+        try {
+            SqlConvert.identifierToSql('tab"le', oracleConfig);
+            Test.assert();
+        } catch (e) {
+            Test.assertEqual(e.message, 'Invalid value. Contains " character');
+        }
 
         // Test errors
         Test.describe('valueToSql errors');
@@ -130,6 +170,10 @@ export default class TestSqlConvert {
      * Test date.
      */
     static testDate() {
+        // Create configs
+        const oracleConfig = new SqlConfig();
+        oracleConfig.databaseType = DatabaseType.ORACLE;
+
         // Test date
         Test.describe('valueToSql date');
         let date = new Date(Date.UTC(2024, 3, 20, 12, 34, 56, 123));
@@ -157,6 +201,18 @@ export default class TestSqlConvert {
         date = new Date(Date.UTC(2024, 3, 2, 1, 3, 6, 1));
         sql = SqlConvert.valueToSql(date);
         Test.assertEqual(sql, '\'2024-04-02 01:03:06.001\'');
+
+        // Test Oracle dates
+        Test.describe('valeToSql Oracle dates');
+        date = new Date(Date.UTC(2024, 3, 2, 1, 3, 6, 1));
+        sql = SqlConvert.valueToSql(date, oracleConfig);
+        Test.assertEqual(sql, 'DATE \'2024-04-02\'');
+
+        // Test Oracle timestamp
+        Test.describe('valueToSql SqlTimestamp');
+        date = new SqlTimestamp(new Date(Date.UTC(2024, 3, 2, 1, 3, 6, 5)));
+        sql = SqlConvert.valueToSql(date, oracleConfig);
+        Test.assertEqual(sql, 'TIMESTAMP \'2024-04-02 01:03:06.005\'');
 
         // Test errors
         Test.describe('dateToSql errors');
@@ -213,6 +269,10 @@ export default class TestSqlConvert {
         mySqlConfig.databaseType = DatabaseType.MYSQL;
         const postgreSQLConfig = new SqlConfig();
         postgreSQLConfig.databaseType = DatabaseType.POSTGRESQL;
+        const msSqlServerConfig = new SqlConfig();
+        msSqlServerConfig.databaseType = DatabaseType.MS_SQL_SERVER;
+        const oracleConfig = new SqlConfig();
+        oracleConfig.databaseType = DatabaseType.ORACLE;
 
         // Test MySQL buffer
         Test.describe('valueToSql MySQL buffer');
@@ -225,6 +285,18 @@ export default class TestSqlConvert {
         buffer = Buffer.from([0, 1, 2, 3, 4, 5, 255]);
         sql = SqlConvert.valueToSql(buffer, postgreSQLConfig);
         Test.assertEqual(sql, '\'\\x000102030405ff\'');
+
+        // Test Microsoft SQL Server buffer
+        Test.describe('valueToSql Microsoft SQL Server buffer');
+        buffer = Buffer.from([0, 1, 2, 3, 4, 5, 255]);
+        sql = SqlConvert.valueToSql(buffer, msSqlServerConfig);
+        Test.assertEqual(sql, '0x000102030405ff');
+
+        // Test Oracle Server buffer
+        Test.describe('valueToSql Oracle buffer');
+        buffer = Buffer.from([0, 1, 2, 3, 4, 5, 255]);
+        sql = SqlConvert.valueToSql(buffer, oracleConfig);
+        Test.assertEqual(sql, 'HEXTORAW(\'000102030405ff\')');
 
         // Test errors
         Test.describe('bufferToSql errors');
@@ -346,6 +418,8 @@ export default class TestSqlConvert {
         postgreSQLConfig.databaseType = DatabaseType.POSTGRESQL;
         const msSqlServerConfig = new SqlConfig();
         msSqlServerConfig.databaseType = DatabaseType.MS_SQL_SERVER;
+        const oracleConfig = new SqlConfig();
+        oracleConfig.databaseType = DatabaseType.ORACLE;
 
         // Make object with toSql function
         const test = {};
@@ -384,6 +458,19 @@ export default class TestSqlConvert {
             Test.assertEqual(e.message, 'Invalid value. Contains "]" character');
         }
 
+        // Test Oracle SqlIdentifer
+        Test.describe('valueToSql Oracle SqlIdentifer');
+        sql = SqlConvert.valueToSql(sqlIdentifier, oracleConfig);
+        Test.assertEqual(sql, '"identifier-test"');
+
+        try {
+            // Test invalid character
+            sql = SqlConvert.identifierToSql('error"character', oracleConfig);
+            Test.assert();
+        } catch (e) {
+            Test.assertEqual(e.message, 'Invalid value. Contains " character');
+        }
+
         // Create SQL trusted
         const sqlTrusted = new SqlTrusted('trusted-test');
 
@@ -410,6 +497,11 @@ export default class TestSqlConvert {
         sql = SqlConvert.valueToSql(sqlJson, msSqlServerConfig);
         Test.assertEqual(sql, 'N\'{"name":"hello\'\'world","age":50}\'');
 
+        // Test Oracle SqlJson
+        Test.describe('valueToSql Oracle SqlJson');
+        sql = SqlConvert.valueToSql(sqlJson, oracleConfig);
+        Test.assertEqual(sql, 'N\'{"name":"hello\'\'world","age":50}\'');
+
         // Create SQL JSON with escape characters
         sqlJson = new SqlJson({ name: 'hello \b\t\r\n\"\'\\ world', age: 50 });
 
@@ -432,6 +524,14 @@ export default class TestSqlConvert {
         // Test Microsoft SQL Server SqlJson escape characters
         Test.describe('valueToSql Microsoft SQL Server SqlJson escape characters');
         sql = SqlConvert.valueToSql(sqlJson, msSqlServerConfig);
+        Test.assertEqual(sql, 'N\'{"name":"hello \\\"\'\'\\\\ world","age":50}\'');
+
+        // Create SQL JSON with escape characters
+        sqlJson = new SqlJson({ name: 'hello \"\'\\ world', age: 50 });
+
+        // Test Oracle SqlJson escape characters
+        Test.describe('valueToSql Oracle SqlJson escape characters');
+        sql = SqlConvert.valueToSql(sqlJson, oracleConfig);
         Test.assertEqual(sql, 'N\'{"name":"hello \\\"\'\'\\\\ world","age":50}\'');
     }
 }
