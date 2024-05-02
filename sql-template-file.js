@@ -4,7 +4,7 @@
  */
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
-import { Path } from 'node:path';
+import Path from 'node:path';
 import { SqlTemplate } from "./sql-template.js";
 
 export class SqlTemplateFile {

@@ -1,17 +1,40 @@
 {
-  "name": "sql-tools",
+  "name": "@coderundebug/sql-tools",
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Collection of SQL tools",
-  "main": "sql-tools.js",
+  "repository": "github:StephenHassall/sql-tools",
+  "funding": "https://github.com/StephenHassall/sql-tools?sponsor=1",
+  "homepage": "https://github.com/StephenHassall/sql-tools",
+  "bugs": {
+    "url": "https://github.com/StephenHassall/sql-tools/issues",
+    "email": "StephenPaulHassall@hotmail.com"
+  },
+  "main": "./sql-tools.js",
+  "types": "./.d.js",
   "directories": {
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "Stephen Paul Hassall",
+  "author": {
+    "name": "Stephen Paul Hassall",
+    "email": "StephenPaulHassall@hotmail.com",
+    "url": "https://coderundebug.com/"
+  },
   "license": "MIT",
+  "keywords": [
+    "sql",
+    "database",
+    "template",
+    "formatting",
+    "mysql",
+    "postgresql",
+    "oracle"
+  ],
+  "engines": {
+    "node": ">=14.13"
+  },  
   "devDependencies": {
     "mssql": "^10.0.2",
     "mysql": "^2.18.1",

@@ -15,7 +15,7 @@ Want another database? Reach out and sponsor me to develop it.
 ## Installation
 
 ```
-npm install @coderundebug/SqlTools
+npm install @coderundebug/sql-tools
 ```
 
 ## Contents
@@ -273,7 +273,9 @@ CREATE TABLE USER (
 
 This is used to load SQL template files and create a new SqlTemplate object. These are *.sql files with template formatting within.
 
-**getTemplate**(*file*, *[importMetaUrl]*, *[sqlConfig]*, *[cache]*)
+### getTemplate
+
+> **getTemplate**(*file*, *[importMetaUrl]*, *[sqlConfig]*, *[cache]*)
 
 ***Description***
 
@@ -298,8 +300,9 @@ postgresqlConfig.databaseType = DatabaseType.POSTGRESQL;
 // Load in SQL template file for PostgreSQL database
 const sqlTemplate2 = await SqlTemplateFile.getTemplate('/pg/select.sql', null, postgresqlConfig);
 ```
+### getTemplateByName
 
-**getTemplateByName**(*name*, *file*, *[importMetaUrl]*, *[sqlConfig]*, *[cache]*)
+> **getTemplateByName**(*name*, *file*, *[importMetaUrl]*, *[sqlConfig]*, *[cache]*)
 
 ***Description***
 
@@ -329,8 +332,8 @@ INSERT INTO table (name, age) VALUES ($name, $age);
 ```javascript
 // Load in SQL template from within file
 const sqlTemplate = await SqlTemplateFile.getTemplateByName(
-	'insert',
-'./sub/collection.sql',
+  'insert',
+  './sub/collection.sql',
 import.meta.url);
 ```
 
@@ -340,7 +343,9 @@ The SQL template class contains the template information and is used to format i
 
 Normally you would get one of these objects by calling one of the SqlTemplateFile static functions, but you can create one supplying your own SQL template text.
 
-**constructor**(*template*, *[sqlConfig]*)
+### constructor
+
+> **constructor**(*template*, *[sqlConfig]*)
 
 ***Description***
 
@@ -355,7 +360,7 @@ The constructor of the `SqlTemplate` class object. When creating your own instan
 
 ```javascript
 // Set template text
-const template = 'INSERT INTO table (name, age) VALUES ($name, &age);'
+const template = 'INSERT INTO table (name, age) VALUES ($name, &age);';
 
 // Create SQL template using the template
 const sqlTemplate = new SqlTemplate(template);
@@ -363,8 +368,9 @@ const sqlTemplate = new SqlTemplate(template);
 // Create SQL command
 const sql = sqlTemplate.format({ name: 'Stephen', age: 42 });
 ```
+### format
 
-**format**(*values*, *[sqlConfig]*)
+> **format**(*values*, *[sqlConfig]*)
 
 ***Description***
 
@@ -379,7 +385,7 @@ Uses the SQL template information the object was created with, along with the va
 
 ```javascript
 // Set template text
-const template = 'INSERT INTO table (name, age) VALUES ($name, &age);'
+const template = 'INSERT INTO table (name, age) VALUES ($name, &age);';
 
 // Create SQL template using the template
 const sqlTemplate = new SqlTemplate(template);
@@ -394,9 +400,11 @@ const sql3 = sqlTemplate.format({ name: 'Sue', age: 58 });
 
 There are a number of configuration settings that can be used to change the SQL text created. There are default values, which can be changed, making all templates output SQL to that configuration, but you can create `SqlTemplate` objects with their own configuration. This would allow you to have one group of templates for MySql and another group for PostgreSQL.
 
-**sqlConfig.default**
+### SqlConfig.default
 
-**Description**
+> **SqlConfig.default**
+
+***Description***
 
 Global default SqlConfig object. If no sqlConfig object is passed to any of the template or format functions, then this default will be used. You can change these default settings at the start of your application and all SqlTool functions will use them by default.
 
@@ -406,32 +414,40 @@ Global default SqlConfig object. If no sqlConfig object is passed to any of the 
 // Start of application
 SqlConfig.default.databaseType = DatabaseType.POSTGRESQL;
 SqlConfig.default.utc = true;
-SqlConfig.removeComments = false;
-SqlConfig.singleLine = false;
+SqlConfig.default.removeComments = false;
+SqlConfig.default.singleLine = false;
 
 // Load in SQL template file (will default to PostgreSQL)
 const sqlTemplate1 = await SqlTemplateFile.getTemplate('./sql/select.sql');
 ```
 
-**databaseType**
+### databaseType
+
+> **databaseType**
 
 ***Description***
 
-Gets and sets the database type. This can be either `MYSQL`, `POSTGRESQL`, `MS_SQL_SERVER` (Microsoft SQL Server) or `Oracle`.
+Gets and sets the database type. This can be either `MYSQL`, `POSTGRESQL`, `MS_SQL_SERVER` (Microsoft SQL Server) or `ORACLE`.
 
-**utc**
+### utc
+
+> **utc**
 
 ***Description***
 
 Gets and sets whether to use UTC when outputting date and time text. If set to false, then it will use the local date and time values of the date object. The results of this will depend on the time zone the application is running on. By default this is set to true, so that it will always use the UTC part of the date when converting it into text.
 
-**removeComments**
+### removeComments
+
+> **removeComments**
 
 ***Description***
 
 Gets and sets if the comments are to be removed when formatting the SQL template. Comments are the parts that do nothing but can help to give extra information about when is happening. These are the parts the start with `/*` and end with `*/`. Other comment types are the ones that start with the `--` characters (or the `#` character) and stop at the end of the line. By default the comments are not removed.
 
-**singleLine**
+### singleLine
+
+> **singleLine**
 
 ***Description***
 
@@ -458,7 +474,9 @@ const sqlMySql = sqlTemplate.format(values, mySqlConfig);
 
 If you want to manually convert values into SQL safe text, without using a template, then you can use this class and its many static functions. Normally you would not need to use this class but it may be useful for you to convert values into SQL yourself.
 
-**valueToSql**(*value*, *[sqlConfig]*)
+### valueToSql
+
+> **valueToSql**(*value*, *[sqlConfig]*)
 
 ***Description***
 
@@ -482,7 +500,9 @@ const sqlText = SqlConvert.valueToSql('Hello world');
 // sqlText = 'Hello world'
 ```
 
-**booleanToSql**(*value*, *[sqlConfig]*)
+### booleanToSql
+
+> **booleanToSql**(*value*, *[sqlConfig]*)
 
 ***Description***
 
@@ -501,7 +521,9 @@ const sqlBoolean = SqlConvert.valueToSql(true);
 // sqlBoolean = TRUE
 ```
 
-**dateToSql**(*value*, *[sqlConfig]*)
+### dateToSql
+
+> **dateToSql**(*value*, *[sqlConfig]*)
 
 ***Description***
 
@@ -520,7 +542,9 @@ const sqlDate = SqlConvert.dateToSql(new Date(Date.UTC(2024, 4, 1, 11, 43, 32));
 // sqlDate = '2024-05-01 11:43:32'
 ```
 
-**stringToSql**(*value*, *[sqlConfig]*)
+### stringToSql
+
+> **stringToSql**(*value*, *[sqlConfig]*)
 
 ***Description***
 
@@ -539,7 +563,9 @@ const sqlString = SqlConvert.stringToSql("Hello 'small' world");
 // sqlString = 'Hello \'small\' world'
 ```
 
-**identifierToSql**(*value*, *[sqlConfig]*)
+### identifierToSql
+
+> **identifierToSql**(*value*, *[sqlConfig]*)
 
 ***Description***
 
@@ -558,7 +584,9 @@ const sqlIdentifier = SqlConvert.identifierToSql('testTable');
 // sqlIdentifier = [testTable]
 ```
 
-**bufferToSql**(*buffer*, *[sqlConfig]*)
+### bufferToSql
+
+> **bufferToSql**(*buffer*, *[sqlConfig]*)
 
 ***Description***
 
@@ -577,7 +605,9 @@ const sqlBuffer = SqlConvert.bufferToSql(Buffer.from([0x1F, 0x2E]));
 // sqlBuffer = X'1F2E'
 ```
 
-**arrayToSql**(*array*, *[sqlConfig]*)
+### arrayToSql
+
+> **arrayToSql**(*array*, *[sqlConfig]*)
 
 ***Description***
 
@@ -596,7 +626,9 @@ const sqlArray = SqlConvert.arrayToSql([123, 456, 789]);
 // sqlArray = '{123, 456, 789}'
 ```
 
-**jsonToSql**(*object*, *[sqlConfig]*)
+### jsonToSql
+
+> **jsonToSql**(*object*, *[sqlConfig]*)
 
 ***Description***
 
