@@ -113,9 +113,6 @@ export class SqlTemplate {
         // Process block tree
         let sql = this._processBlockTree(this._blockTree);
 
-        // Process values
-        sql = this._processSqlValues(sql);
-
         // If no SQL config the set the one it was created with
         if (!sqlConfig) sqlConfig = this._sqlConfig;
 
@@ -130,6 +127,9 @@ export class SqlTemplate {
             // Make single line
             sql = this._makeSingleLine(sql);
         }
+
+        // Process values
+        sql = this._processSqlValues(sql);
 
         // Return the final SQL
         return sql;

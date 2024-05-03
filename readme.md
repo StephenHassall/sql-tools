@@ -443,7 +443,7 @@ Gets and sets whether to use UTC when outputting date and time text. If set to f
 
 ***Description***
 
-Gets and sets if the comments are to be removed when formatting the SQL template. Comments are the parts that do nothing but can help to give extra information about when is happening. These are the parts the start with `/*` and end with `*/`. Other comment types are the ones that start with the `--` characters (or the `#` character) and stop at the end of the line. By default the comments are not removed.
+Gets and sets if the comments are to be removed when formatting the SQL template. Comments are the parts that do nothing but can help to give extra information about when is happening. These are the parts the start with `/*` and end with `*/`. Other comment types are the ones that start with the `--` characters (or the `#` character) and stop at the end of the line. By default the comments are removed.
 
 ### singleLine
 

@@ -1,7 +1,7 @@
 {
   "name": "@coderundebug/sql-tools",
   "type": "module",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Collection of SQL tools",
   "repository": "github:StephenHassall/sql-tools",
   "funding": "https://github.com/StephenHassall/sql-tools?sponsor=1",

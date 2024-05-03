@@ -5,6 +5,7 @@ import { BlockType } from "../block.js";
 import { readFile } from "node:fs/promises";
 import { SqlConfig, DatabaseType } from "../sql-config.js";
 import { SqlTemplate } from "../sql-template.js";
+import { SqlTemplateFile } from "../sql-template-file.js";
 import Test from "./test.js";
 
 export default class TestSqlTemplate {
@@ -23,6 +24,7 @@ export default class TestSqlTemplate {
         TestSqlTemplate.testProcessSqlValues();
         TestSqlTemplate.testRemoveComments();
         TestSqlTemplate.testMakeSingleLine();
+        await TestSqlTemplate.testIssues();
     }
 
     /**
@@ -598,5 +600,37 @@ export default class TestSqlTemplate {
 
         sql = sqlTemplate._makeSingleLine('hello || world');
         Test.assertEqual(sql, 'hello || world');
+    }
+
+    /**
+     * Test possible issues.
+     */
+    static async testIssues() {
+        // Get issue 1
+        Test.describe('testIssues comments in string data');
+        let sqlTemplate = await SqlTemplateFile.getTemplate('./sql/issue1.sql', import.meta.url);
+        SqlConfig.default.removeComments = true;
+        const values = {};
+        values.test = 'hello -- world';
+        let sql = sqlTemplate.format(values);
+        Test.assertEqual(sql, 'SELECT \'hello -- world\';');
+        values.test = 'hello /*comment*/ world';
+        sql = sqlTemplate.format(values);
+        Test.assertEqual(sql, 'SELECT \'hello /*comment*/ world\';');
+        values.test = 'hello // comment\r\n world';
+        sql = sqlTemplate.format(values);
+        Test.assertEqual(sql, 'SELECT \'hello // comment\\r\\n world\';');
+        values.test = 'hello # comment world';
+        sql = sqlTemplate.format(values);
+        Test.assertEqual(sql, 'SELECT \'hello # comment world\';');
+
+        // Get issue 2
+        Test.describe('testIssues using replace comment issue to perform SQL injection');
+        sqlTemplate = await SqlTemplateFile.getTemplate('./sql/issue2.sql', import.meta.url);
+        SqlConfig.default.removeComments = true;
+        values.userName = 'admin--';
+        values.hashedPassword = ' OR 1=1 LIMIT 1--';
+        sql = sqlTemplate.format(values);
+        Test.assertEqual(sql, 'SELECT user_id FROM users WHERE username=\'admin--\' AND password=\' OR 1=1 LIMIT 1--\';');
     }
 }
